@@ -17,12 +17,55 @@ repositories {
 	mavenCentral()
 }
 
-dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+ext {
+	set('springCloudVersion', "2024.0.0")
 }
 
-tasks.named('test') {
-	useJUnitPlatform()
+bootJar {
+	enabled = false
+}
+
+jar {
+	enabled = false
+}
+
+subprojects {
+	group = 'com.kakako'
+
+	// 플러그인
+	apply plugin: 'java'
+	apply plugin: 'org.springframework.boot'
+	apply plugin: 'io.spring.dependency-management'
+
+	repositories {
+		mavenCentral()
+	}
+
+	// Java 버전 설정
+	java {
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(17)
+		}
+	}
+
+	// JAR 관련 설정
+	jar {
+		enabled = false
+	}
+
+	bootJar {
+		enabled = true
+	}
+
+	// Spring Cloud 의존성 관리
+	dependencyManagement {
+		imports {
+			mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+		}
+	}
+
+	dependencies {
+		implementation 'org.springframework.boot:spring-boot-starter'
+		testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	}
 }

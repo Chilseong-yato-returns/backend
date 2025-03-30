@@ -1,1 +1,4 @@
 rootProject.name = 'theme'
+
+include 'gateway-service'
+include 'discovery-service'

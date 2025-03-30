@@ -1,18 +1,11 @@
-# Gradle 관련 파일
+HELP.md
 .gradle
 build/
-**/build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-# 출력 디렉토리
-out/
-**/out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-# IDE - STS
+### STS ###
 .apt_generated
 .classpath
 .factorypath
@@ -24,25 +17,21 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-# IDE - IntelliJ IDEA
+### IntelliJ IDEA ###
 .idea
 *.iws
 *.iml
 *.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
 
-# IDE - NetBeans
+### NetBeans ###
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-# IDE - VS Code
+### VS Code ###
 .vscode/
-
-# 기타 파일
-HELP.md
-gradle-app.setting
-
-
-**/application.yml

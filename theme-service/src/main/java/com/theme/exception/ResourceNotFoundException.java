@@ -1,4 +1,4 @@
-package com.theme.exeption;
+package com.theme.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;

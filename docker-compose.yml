@@ -4,11 +4,12 @@ services:
     container_name: database_theme
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: 0000
+      MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: theme
       MYSQL_ROOT_HOST: "%"
+
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     networks:

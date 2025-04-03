@@ -3,11 +3,11 @@ package com.theme.service;
 import com.theme.auth.JwtUtils;
 import com.theme.client.KakaoAuthHttpClient;
 import com.theme.domain.User;
-import com.theme.dto.KakaoUserInfo;
 import com.theme.dto.UserAuthResponse;
 import com.theme.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
 
 @Service
 public class UserAuthService {
@@ -26,19 +26,20 @@ public class UserAuthService {
      * 카카오 로그인 및 회원가입
     * */
     @Transactional
-    public UserAuthResponse kakaoLogin() {
-        KakaoUserInfo kakaoUserInfo = kakaoAuthHttpClient.processLogin();
-        if(userRepository.findById(kakaoUserInfo.getEmail()).orElse(null) == null) {
-            userRepository.save(User.builder()
-                .userEmail(kakaoUserInfo.getEmail())
-                .profileImg(kakaoUserInfo.getProfileImage())
-                .build());
-        }
-        String serviceAccessToken = jwtUtils.generateAccessToken(kakaoUserInfo.getEmail());
-        String serviceRefreshToken = jwtUtils.generateRefreshToken(kakaoUserInfo.getEmail());
-        return UserAuthResponse.builder()
-                .accessToken(serviceAccessToken)
-                .refreshToken(serviceRefreshToken)
-                .build();
+    public Mono<UserAuthResponse> processKakaoAuth(String authCode) {
+        return kakaoAuthHttpClient.processLogin(authCode)
+                .flatMap(userInfo ->{
+                    User user = userRepository.findById(userInfo.getEmail()).orElse(null);
+                    if(user == null) user = userRepository.save(userInfo.toEntity());
+                    return Mono.just(user);
+                })
+                .map(user -> {
+                    String accessToken = jwtUtils.generateAccessToken(user.getUserEmail());
+                    String refreshToken = jwtUtils.generateRefreshToken(user.getUserEmail());
+                    return UserAuthResponse.builder()
+                            .accessToken(accessToken)
+                            .refreshToken(refreshToken)
+                            .build();
+                });
     }
 }

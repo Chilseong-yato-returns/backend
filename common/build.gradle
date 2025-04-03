@@ -9,6 +9,10 @@ repositories {
     mavenCentral()
 }
 
+jar{
+    enabled=true;
+}
+
 dependencies {
     // web
     implementation 'org.springframework.boot:spring-boot-starter-web'

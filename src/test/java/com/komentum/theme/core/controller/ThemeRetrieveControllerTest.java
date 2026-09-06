@@ -1,4 +1,4 @@
-package com.komentum.theme.controller;
+package com.komentum.theme.core.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.komentum.designcomponent.domain.DesignComponent;
+import com.komentum.designcomponent.enums.TypeCode;
 import com.komentum.global.utils.FileManager;
 import com.komentum.post.domain.ThemeBoard;
 import com.komentum.test.MockMvcUtils;
@@ -26,6 +27,7 @@ import com.komentum.test.dto.TestClientDto;
 import com.komentum.theme.core.domain.ThemeComponent;
 import com.komentum.theme.core.dto.ThemeComponentDto;
 import com.komentum.theme.core.dto.ThemeDetailResponse;
+import com.komentum.theme.core.dto.ThemeDetailResponse.TypeCodeInfo;
 import com.komentum.theme.core.dto.ThemePreviewDto;
 import com.komentum.user.domain.User;
 import java.util.List;
@@ -146,7 +148,7 @@ class ThemeRetrieveControllerTest {
   }
 
   @Test
-  @DisplayName("")
+  @DisplayName("사용자가 특정 테마를 상세 조회한다")
   void findThemeById_success() throws Exception {
     // given
     ThemeComponent toFind = tcResult.themeComponents().get(0);
@@ -165,6 +167,13 @@ class ThemeRetrieveControllerTest {
     assertThat(response.getThemeName()).isEqualTo(toFind.getThemeName());
     assertThat(response.getTypeCodes()).isNotEmpty();
     assertThat(response.getStyleCodes()).isNotEmpty();
+    for (TypeCode key : response.getTypeCodes().keySet()) {
+      TypeCodeInfo typeCodeInfo = response.getTypeCodes().get(key);
+      assertThat(typeCodeInfo.getDesignComponentId()).isNotNull();
+      assertThat(typeCodeInfo.getImageUrl()).isNotBlank();
+      assertThat(typeCodeInfo.getTypeCodeGroup()).isNotNull();
+      assertThat(typeCodeInfo.getTypeCodeGroupName()).isNotBlank();
+    }
   }
 
   @Test

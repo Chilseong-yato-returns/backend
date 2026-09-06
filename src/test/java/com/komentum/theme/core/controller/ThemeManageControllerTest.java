@@ -1,4 +1,4 @@
-package com.komentum.theme.controller;
+package com.komentum.theme.core.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;

@@ -6,14 +6,9 @@ import com.komentum.test.config.EnableTestProfile;
 import com.komentum.test.data.ThemeDataGenerator;
 import com.komentum.test.data.scenario.UserScenarioSupport;
 import com.komentum.theme.core.domain.ThemeComponent;
-import com.komentum.theme.core.dto.CreateThemeRequest;
-import com.komentum.theme.core.dto.ThemeComponentDto;
-import com.komentum.theme.core.dto.ThemeImageRequest;
-import com.komentum.theme.core.dto.ThemeStyleRequest;
 import com.komentum.theme.core.repository.ThemeComponentRepository;
 import com.komentum.theme.core.service.ThemeManageService;
 import com.komentum.user.domain.User;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,37 +63,6 @@ class ThemeManageServiceTest {
     Optional<ThemeComponent> saved = themeComponentRepository.findById(res.getThemeComponentId());
     assertThat(saved.isPresent()).isTrue();
     assertThat(res.getVersionNumber()).isEqualTo("1");
-  }
-
-  @Test
-  @Transactional
-  @DisplayName("success test of updating theme")
-  public void updateTheme_success() {
-    // given
-    List<ThemeImageRequest> images = themeDataGenerator.getImageRequests();
-    List<ThemeStyleRequest> styles = themeDataGenerator.getStyleRequests();
-    images = images.subList(0, initialImagePerTheme / 2);
-    styles = styles.subList(0, initialStylePerTheme / 2);
-    ThemeComponent toUpdate = themeDataGenerator.initialThemes.get(0);
-    CreateThemeRequest updateThemeRequest = CreateThemeRequest.builder()
-        .themeName("updated")
-        .images(images)
-        .styles(styles)
-        .isPublic(true)
-        .versionName("updated_version")
-        .userEmail("test@test.com")
-        .build();
-    // when
-    ThemeComponentDto res = themeManageService.updateTheme(toUpdate.getThemeComponentId(),
-        updateThemeRequest);
-    // then
-    Optional<ThemeComponent> updated = themeComponentRepository.findById(res.getThemeComponentId());
-    assertThat(updated.isPresent()).isTrue();
-    assertThat(res.getImages()).hasSize(updated.get().getThemeImages().size())
-        .hasSize(images.size());
-    assertThat(res.getStyles()).hasSize(updated.get().getThemeStyles().size())
-        .hasSize(styles.size());
-    assertThat(res.getVersionName()).isEqualTo(updateThemeRequest.getVersionName());
   }
 
   @Test

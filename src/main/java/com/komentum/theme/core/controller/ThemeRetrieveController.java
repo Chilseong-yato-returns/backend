@@ -29,38 +29,37 @@ public class ThemeRetrieveController {
   private final ThemeRetrieveService themeRetrieveService;
 
   @GetMapping
-  @Operation(summary = "인증된 사용자가 모든 테마를 조회한다")
+  @Operation(summary = "사용자가 모든 테마를 조회한다")
   public ResponseEntity<List<ThemeComponentDto>> getAllThemes(
       @PageableDefault(size = 20) @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(themeRetrieveService.getAllThemes(pageable));
   }
 
   @GetMapping("/public")
-  @Operation(summary = "인증된 사용자가 공개된 모든 테마를 조회한다")
+  @Operation(summary = "사용자가 공개된 모든 테마를 조회한다")
   public ResponseEntity<List<ThemeComponentDto>> getPublicThemes(
       @PageableDefault(size = 20) @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(themeRetrieveService.getPublicThemes(pageable));
   }
 
-  @GetMapping("/user/{userEmail}")
-  @Operation(summary = "인증된 사용자가 특정 사용자의 모든 테마를 조회한다")
-  public ResponseEntity<List<ThemeComponentDto>> getThemesByUserEmail(
-      @Parameter(description = "조회할 사용자의 이메일", example = "user@example.com")
-      @PathVariable("userEmail") String userEmail,
+  @GetMapping("/user/{publicUserId}")
+  @Operation(summary = "사용자가 특정 사용자의 모든 테마를 내림차순 조회한다")
+  public ResponseEntity<List<ThemeComponentDto>> getThemeByPublicUserId(
+      @PathVariable @Parameter(description = "조회할 사용자의 public user id", example = "UUID(String)") String publicUserId,
       @PageableDefault(size = 20) @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(
-        themeRetrieveService.getThemesByUserEmail(userEmail, pageable));
+        themeRetrieveService.findByPublicUserId(publicUserId, pageable));
   }
 
   @GetMapping("/{themeComponentId}")
-  @Operation(summary = "인증된 사용자가 ID로 특정 테마를 조회한다")
+  @Operation(summary = "사용자가 ID로 특정 테마를 조회한다")
   public ResponseEntity<ThemeDetailResponse> findThemeById(
       @PathVariable @Parameter(description = "조회할 테마의 ID", example = "1") Integer themeComponentId) {
     return ResponseEntity.ok(themeRetrieveService.findThemeDetail(themeComponentId));
   }
 
   @GetMapping("/completed")
-  @Operation(summary = "인증된 사용자가 완성된 모든 테마를 조회한다")
+  @Operation(summary = "사용자가 완성된 모든 테마를 조회한다")
   public ResponseEntity<List<ThemeComponentDto>> getCompletedThemes(
       @PageableDefault(size = 20) @ParameterObject Pageable pageable) {
     List<ThemeComponentDto> completedThemes = themeRetrieveService.getCompletedThemes(
@@ -85,8 +84,8 @@ public class ThemeRetrieveController {
       @PageableDefault(size = 20) @ParameterObject Pageable pageable,
       @AuthenticationPrincipal CustomUserDetails userDetails
   ) {
-    List<ThemePreviewDto> res = themeRetrieveService.findPopularThemeList(pageable,
-        userDetails.getUsername());
+    String userIdentifier = userDetails == null ? null : userDetails.getUsername();
+    List<ThemePreviewDto> res = themeRetrieveService.findPopularThemeList(pageable, userIdentifier);
     return ResponseEntity.ok(res);
   }
 

@@ -50,6 +50,16 @@ public class ThemeRetrieveService {
   }
 
   @Transactional(readOnly = true)
+  public List<ThemeComponentDto> findByPublicUserId(String publicUserId, Pageable pageable) {
+    User client = userEntityFinder.findUserEntity(publicUserId);
+    ThemeSearchCondition condition = new ThemeSearchCondition();
+    condition.withPublicUserId(publicUserId);
+    List<ThemeComponent> themeComponents = themeComponentRepositorySupport.findAllThemesByCondition(
+        pageable, client, condition, List.of(ThemeSortType.CREATED_DESC));
+    return convertToDtosWithPreviewImages(themeComponents);
+  }
+
+  @Transactional(readOnly = true)
   public List<ThemeComponentDto> getPublicThemes(Pageable pageable) {
     return convertToDtosWithPreviewImages(themeComponentRepository.findByIsPublicTrue(pageable));
   }
@@ -103,7 +113,7 @@ public class ThemeRetrieveService {
 
   @Transactional(readOnly = true)
   public List<ThemePreviewDto> findPopularThemeList(Pageable pageable, String userIdentifier) {
-    User client = userEntityFinder.findUserEntity(userIdentifier);
+    User client = userIdentifier != null ? userEntityFinder.findUserEntity(userIdentifier) : null;
     ThemeSearchCondition condition = new ThemeSearchCondition();
     List<ThemeComponent> themeComponents = themeComponentRepositorySupport.findAllThemesByCondition(
         pageable,

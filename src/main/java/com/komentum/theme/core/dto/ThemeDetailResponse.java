@@ -6,6 +6,7 @@ import com.komentum.designcomponent.enums.PlatformScope;
 import com.komentum.designcomponent.enums.StyleCode;
 import com.komentum.designcomponent.enums.TypeCode;
 import com.komentum.designcomponent.enums.TypeCodeGroup;
+import com.komentum.theme.core.domain.ImageInset;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
 import lombok.AllArgsConstructor;
@@ -49,8 +50,11 @@ public class ThemeDetailResponse {
     TypeCodeGroup typeCodeGroup;
     @Schema(description = "이미지 대분류 이름")
     String typeCodeGroupName;
+    @Schema(description = "이미지 인셋 정보 ( 인셋이 없으면 NULL )")
+    InsetResponseDto inset;
 
-    public static TypeCodeInfo of(DesignComponent designComponent, ComponentType componentType) {
+    public static TypeCodeInfo of(DesignComponent designComponent, ComponentType componentType,
+        ImageInset inset) {
       TypeCode typeCode = componentType.getTypeCode();
       return TypeCodeInfo.builder()
           .designComponentId(designComponent.getDesignComponentId())
@@ -58,7 +62,37 @@ public class ThemeDetailResponse {
           .platformScope(componentType.getPlatformScope())
           .typeCodeGroup(typeCode.getTypeCodeGroup())
           .typeCodeGroupName(typeCode.getTypeCodeGroup().getDescription())
+          .inset(InsetResponseDto.from(inset))
           .build();
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    static class InsetResponseDto {
+
+      Integer stretchX;
+      Integer stretchY;
+      Integer top;
+      Integer bottom;
+      Integer left;
+      Integer right;
+
+      public static InsetResponseDto from(ImageInset inset) {
+        if (inset == null) {
+          return null;
+        }
+        return InsetResponseDto.builder()
+            .stretchX(inset.getStretchX())
+            .stretchY(inset.getStretchY())
+            .top(inset.getEdgeInsetTop())
+            .bottom(inset.getEdgeInsetBottom())
+            .left(inset.getEdgeInsetLeft())
+            .right(inset.getEdgeInsetRight())
+            .build();
+      }
     }
   }
 

@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.komentum.designcomponent.domain.DesignComponent;
 import com.komentum.designcomponent.enums.TypeCode;
+import com.komentum.designcomponent.enums.TypeCodeGroup;
 import com.komentum.global.utils.FileManager;
 import com.komentum.post.domain.ThemeBoard;
 import com.komentum.test.MockMvcUtils;
@@ -173,6 +174,9 @@ class ThemeRetrieveControllerTest {
       assertThat(typeCodeInfo.getImageUrl()).isNotBlank();
       assertThat(typeCodeInfo.getTypeCodeGroup()).isNotNull();
       assertThat(typeCodeInfo.getTypeCodeGroupName()).isNotBlank();
+      if (key.getTypeCodeGroup().equals(TypeCodeGroup.CHATROOM_BUBBLE)) {
+        assertThat(typeCodeInfo.getInset()).isNotNull();
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 package com.komentum.theme.core.controller;
 
 import com.komentum.global.dto.CustomUserDetails;
+import com.komentum.theme.core.dto.ThemeCloneRequest;
 import com.komentum.theme.core.dto.ThemeComponentDto;
 import com.komentum.theme.core.dto.ThemeDetailResponse;
 import com.komentum.theme.core.dto.ThemeUpdateRequest;
@@ -78,5 +79,17 @@ public class ThemeManageController {
   ) {
     defaultThemeSeeder.seedDefaultThemes(userDetails.getPublicUserId());
     return ResponseEntity.ok().build();
+  }
+
+  @PostMapping("/clone")
+  @Operation(summary = "인증된 사용자가 요청 본문의 이미지/색상 정보를 기반으로 테마를 복제한다")
+  public ResponseEntity<ThemeDetailResponse> cloneTheme(
+      @AuthenticationPrincipal CustomUserDetails userDetails,
+      @Valid @RequestBody ThemeCloneRequest request
+  ) {
+    return new ResponseEntity<>(
+        themeManagementFacade.cloneTheme(request, userDetails.getPublicUserId()),
+        HttpStatus.CREATED
+    );
   }
 }

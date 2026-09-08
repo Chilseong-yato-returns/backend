@@ -1,7 +1,10 @@
 package com.komentum.theme.core.service;
 
 import com.google.common.base.Functions;
+import com.komentum.designcomponent.domain.ColorStyle;
+import com.komentum.designcomponent.enums.PlatformScope;
 import com.komentum.designcomponent.enums.StyleCode;
+import com.komentum.designcomponent.service.ColorStyleService;
 import com.komentum.global.exception.ResourceNotFoundException;
 import com.komentum.theme.core.domain.ThemeComponent;
 import com.komentum.theme.core.domain.ThemeStyle;
@@ -11,12 +14,15 @@ import com.komentum.theme.core.repository.ThemeStyleRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -24,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ThemeStyleService {
 
   private final ThemeStyleRepository themeStyleRepository;
+  private final ColorStyleService colorStyleService;
 
   @Transactional(readOnly = true)
   public Map<StyleCode, StyleCodeInfo> findStyleCodeMapByThemeComponentId(
@@ -66,6 +73,62 @@ public class ThemeStyleService {
       targetTheme.addThemeStyle(targetThemeStyle);
     }
     themeStyleRepository.saveAll(targetThemeStyles);
+  }
+
+  /**
+   * styleCode별 색상 정보로 새로운 ThemeStyle들을 생성하여 targetTheme에 추가한다.
+   * platformScope=COMMON인 StyleCode는 요청에 반드시 포함되어야 하며, 특정 플랫폼 전용(ANDROID/IOS) StyleCode는
+   * 요청에 없어도 된다. 요청에 포함된 StyleCode는 targetTheme에 아직 스타일이 없는 상태여야 한다.
+   *
+   * @param targetTheme 스타일을 추가할 대상 테마
+   * @param styleCodes  styleCode별 색상 정보 맵, 존재하는 값은 null이 아니어야 한다
+   * @throws ResponseStatusException   platformScope=COMMON인 StyleCode가 요청에 누락된 경우 (400 Bad Request)
+   * @throws ResourceNotFoundException styleCode에 대응하는 ColorStyle이 존재하지 않는 경우
+   * @throws IllegalArgumentException  요청 항목의 color 또는 alpha가 null이거나 alpha가 0~100 범위를 벗어난 경우
+   */
+  @Transactional
+  public void createThemeStyles(
+      ThemeComponent targetTheme,
+      Map<StyleCode, ThemeStyleUpdateRequest> styleCodes
+  ) {
+    Map<StyleCode, ColorStyle> colorStyleMap = colorStyleService.findColorStyleMap();
+    validateCommonStyleCodesPresent(colorStyleMap, styleCodes);
+    List<ThemeStyle> themeStyles = new ArrayList<>();
+    styleCodes.forEach((styleCode, styleRequest) -> {
+      ColorStyle colorStyle = colorStyleMap.get(styleCode);
+      if (colorStyle == null) {
+        throw new ResourceNotFoundException("ColorStyle not found for styleCode: " + styleCode);
+      }
+      ThemeStyle themeStyle = ThemeStyle.builder()
+          .themeComponent(targetTheme)
+          .colorStyle(colorStyle)
+          .build();
+      themeStyle.updateColorAndAlpha(styleRequest.getColor(), styleRequest.getAlpha());
+      themeStyles.add(themeStyle);
+      targetTheme.addThemeStyle(themeStyle);
+    });
+    themeStyleRepository.saveAll(themeStyles);
+  }
+
+  /**
+   * platformScope=COMMON인 StyleCode가 요청에 누락 없이 포함되어 있는지 검증한다.
+   * 특정 플랫폼 전용(ANDROID/IOS) StyleCode는 검증 대상이 아니다.
+   *
+   * @throws ResponseStatusException 누락된 COMMON StyleCode가 있는 경우 (400 Bad Request)
+   */
+  private void validateCommonStyleCodesPresent(
+      Map<StyleCode, ColorStyle> colorStyleMap,
+      Map<StyleCode, ThemeStyleUpdateRequest> styleCodes
+  ) {
+    Set<StyleCode> missingCommonStyleCodes = colorStyleMap.entrySet().stream()
+        .filter(entry -> entry.getValue().getPlatformScope() == PlatformScope.COMMON)
+        .map(Entry::getKey)
+        .filter(styleCode -> styleCodes.get(styleCode) == null)
+        .collect(Collectors.toSet());
+    if (!missingCommonStyleCodes.isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "common StyleCode(s) missing in request: " + missingCommonStyleCodes);
+    }
   }
 
   /**

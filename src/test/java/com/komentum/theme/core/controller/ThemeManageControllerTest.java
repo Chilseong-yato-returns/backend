@@ -1,12 +1,19 @@
-package com.komentum.theme.controller;
+package com.komentum.theme.core.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.komentum.designcomponent.domain.ColorStyle;
+import com.komentum.designcomponent.domain.ComponentType;
 import com.komentum.designcomponent.domain.DesignComponent;
+import com.komentum.designcomponent.dto.ColorStyleUpdateRequest;
+import com.komentum.designcomponent.dto.ComponentTypeUpdateRequest;
+import com.komentum.designcomponent.enums.PlatformScope;
 import com.komentum.designcomponent.enums.StyleCode;
 import com.komentum.designcomponent.enums.TypeCode;
+import com.komentum.designcomponent.service.ColorStyleService;
+import com.komentum.designcomponent.service.ComponentTypeService;
 import com.komentum.test.MockMvcUtils;
 import com.komentum.test.config.EnableTestProfile;
 import com.komentum.test.data.TestDataRemover;
@@ -19,6 +26,7 @@ import com.komentum.test.dto.TestClientDto;
 import com.komentum.theme.core.domain.ThemeComponent;
 import com.komentum.theme.core.domain.ThemeImage;
 import com.komentum.theme.core.domain.ThemeStyle;
+import com.komentum.theme.core.dto.ThemeCloneRequest;
 import com.komentum.theme.core.dto.ThemeDetailResponse;
 import com.komentum.theme.core.dto.ThemeUpdateRequest;
 import com.komentum.theme.core.dto.ThemeUpdateRequest.InsetUpdateDto;
@@ -31,6 +39,7 @@ import com.komentum.user.domain.User;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -68,6 +77,10 @@ class ThemeManageControllerTest {
   private ThemeImageRepository themeImageRepository;
   @Autowired
   private ThemeStyleRepository themeStyleRepository;
+  @Autowired
+  private ComponentTypeService componentTypeService;
+  @Autowired
+  private ColorStyleService colorStyleService;
   private User testUser;
   private List<DesignComponent> designComponentList;
 
@@ -229,6 +242,111 @@ class ThemeManageControllerTest {
   }
 
   @Test
+  @DisplayName("사용자는 이미지/색상 정보를 기반으로 테마를 복제할 수 있고, 복제된 테마의 제작자는 자기 자신이다")
+  public void cloneTheme_success() throws Exception {
+    // given
+    ThemeComponent sourceTheme = themeComponentScenarioSupport
+        .builder(List.of(testUser), designComponentList)
+        .withCountPerUser(1).build().themeComponents().get(0);
+    ThemeCloneRequest cloneRequest = buildCloneRequestFromTheme(sourceTheme.getThemeComponentId(),
+        "cloned theme");
+    // when
+    ResultActions resultActions = doThemeCloneRequest(cloneRequest, testUser);
+    // then
+    resultActions.andExpect(status().isCreated());
+    ThemeDetailResponse response = mockMvcUtils.parseResponse(resultActions, new TypeReference<>() {
+    });
+    assertThat(response.getThemeComponentId()).isNotEqualTo(sourceTheme.getThemeComponentId());
+    assertThat(response.getThemeName()).isEqualTo("cloned theme");
+    assertThat(response.getTypeCodes()).hasSize(TypeCode.values().length);
+    assertThat(response.getStyleCodes()).hasSize(StyleCode.values().length);
+    ThemeComponent clonedTheme = themeComponentRepository.findById(response.getThemeComponentId())
+        .orElseThrow();
+    assertThat(clonedTheme.getUserEmail()).isEqualTo(testUser.getUserEmail());
+  }
+
+  @Test
+  @DisplayName("복제 요청에 TypeCode가 누락되면 테마를 복제할 수 없다")
+  public void cloneTheme_failWhenTypeCodeMissing() throws Exception {
+    // given
+    ThemeComponent sourceTheme = themeComponentScenarioSupport
+        .builder(List.of(testUser), designComponentList)
+        .withCountPerUser(1).build().themeComponents().get(0);
+    ThemeCloneRequest cloneRequest = buildCloneRequestFromTheme(sourceTheme.getThemeComponentId(),
+        "cloned theme");
+    Map<TypeCode, ThemeImageUpdateRequest> incompleteTypeCodes = new HashMap<>(
+        cloneRequest.getTypeCodes());
+    incompleteTypeCodes.remove(TypeCode.COMMON_ICO_THEME);
+    cloneRequest.setTypeCodes(incompleteTypeCodes);
+    // when
+    ResultActions resultActions = doThemeCloneRequest(cloneRequest, testUser);
+    // then
+    resultActions.andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("복제 요청에 StyleCode가 누락되면 테마를 복제할 수 없다")
+  public void cloneTheme_failWhenStyleCodeMissing() throws Exception {
+    // given
+    ThemeComponent sourceTheme = themeComponentScenarioSupport
+        .builder(List.of(testUser), designComponentList)
+        .withCountPerUser(1).build().themeComponents().get(0);
+    ThemeCloneRequest cloneRequest = buildCloneRequestFromTheme(sourceTheme.getThemeComponentId(),
+        "cloned theme");
+    Map<StyleCode, ThemeStyleUpdateRequest> incompleteStyleCodes = new HashMap<>(
+        cloneRequest.getStyleCodes());
+    incompleteStyleCodes.remove(StyleCode.CHAT_ROOM_BACKGROUND_COLOR);
+    cloneRequest.setStyleCodes(incompleteStyleCodes);
+    // when
+    ResultActions resultActions = doThemeCloneRequest(cloneRequest, testUser);
+    // then
+    resultActions.andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("platformScope가 COMMON이 아닌 TypeCode/StyleCode는 요청에 없어도 테마를 복제할 수 있다")
+  public void cloneTheme_success_whenPlatformSpecificCodeIsMissing() throws Exception {
+    // given
+    ThemeComponent sourceTheme = themeComponentScenarioSupport
+        .builder(List.of(testUser), designComponentList)
+        .withCountPerUser(1).build().themeComponents().get(0);
+    ComponentType androidOnlyComponentType = componentTypeService.findComponentTypeMap()
+        .get(TypeCode.COMMON_ICO_THEME);
+    componentTypeService.updateComponentType(androidOnlyComponentType.getComponentTypeId(),
+        ComponentTypeUpdateRequest.builder()
+            .name(androidOnlyComponentType.getName())
+            .typeCode(TypeCode.COMMON_ICO_THEME)
+            .platformScope(PlatformScope.ANDROID)
+            .build());
+    ColorStyle androidOnlyColorStyle = colorStyleService.findColorStyleMap()
+        .get(StyleCode.CHAT_ROOM_BACKGROUND_COLOR);
+    colorStyleService.updateColorStyle(androidOnlyColorStyle.getColorStyleId(),
+        ColorStyleUpdateRequest.builder()
+            .name(androidOnlyColorStyle.getName())
+            .styleCode(StyleCode.CHAT_ROOM_BACKGROUND_COLOR)
+            .platformScope(PlatformScope.ANDROID)
+            .build());
+    ThemeCloneRequest cloneRequest = buildCloneRequestFromTheme(sourceTheme.getThemeComponentId(),
+        "cloned theme");
+    Map<TypeCode, ThemeImageUpdateRequest> typeCodesWithoutPlatformSpecific = new HashMap<>(
+        cloneRequest.getTypeCodes());
+    typeCodesWithoutPlatformSpecific.remove(TypeCode.COMMON_ICO_THEME);
+    cloneRequest.setTypeCodes(typeCodesWithoutPlatformSpecific);
+    Map<StyleCode, ThemeStyleUpdateRequest> styleCodesWithoutPlatformSpecific = new HashMap<>(
+        cloneRequest.getStyleCodes());
+    styleCodesWithoutPlatformSpecific.remove(StyleCode.CHAT_ROOM_BACKGROUND_COLOR);
+    cloneRequest.setStyleCodes(styleCodesWithoutPlatformSpecific);
+    // when
+    ResultActions resultActions = doThemeCloneRequest(cloneRequest, testUser);
+    // then
+    resultActions.andExpect(status().isCreated());
+    ThemeDetailResponse response = mockMvcUtils.parseResponse(resultActions, new TypeReference<>() {
+    });
+    assertThat(response.getTypeCodes()).doesNotContainKey(TypeCode.COMMON_ICO_THEME);
+    assertThat(response.getStyleCodes()).doesNotContainKey(StyleCode.CHAT_ROOM_BACKGROUND_COLOR);
+  }
+
+  @Test
   @DisplayName("")
   public void markThemeAsDone_success() throws Exception {
     // given
@@ -284,5 +402,40 @@ class ThemeManageControllerTest {
     assertThat(themeImageRepository.count()).isEqualTo(TypeCode.values().length);
     assertThat(themeStyleRepository.count()).isEqualTo(StyleCode.values().length);
     resultActions.andExpect(status().isOk());
+  }
+
+  private ThemeCloneRequest buildCloneRequestFromTheme(Integer themeComponentId, String themeName) {
+    Map<TypeCode, ThemeImageUpdateRequest> typeCodes = themeImageRepository
+        .fetchJoinAllByThemeComponentId(themeComponentId).stream()
+        .collect(Collectors.toMap(
+            ti -> ti.getComponentType().getTypeCode(),
+            ti -> ThemeImageUpdateRequest.builder()
+                .designComponentId(ti.getDesignComponent().getDesignComponentId())
+                .build()
+        ));
+    Map<StyleCode, ThemeStyleUpdateRequest> styleCodes = themeStyleRepository
+        .fetchJoinAllByThemeComponentId(themeComponentId).stream()
+        .collect(Collectors.toMap(
+            ts -> ts.getColorStyle().getStyleCode(),
+            ts -> ThemeStyleUpdateRequest.builder()
+                .color(ts.getColor())
+                .alpha(ts.getAlpha())
+                .build()
+        ));
+    return ThemeCloneRequest.builder()
+        .themeName(themeName)
+        .typeCodes(typeCodes)
+        .styleCodes(styleCodes)
+        .build();
+  }
+
+  private ResultActions doThemeCloneRequest(ThemeCloneRequest dto, User client) throws Exception {
+    return mockMvcUtils.performAuthRequest(
+        MockMvcRequestBuilders.post("/api/themes/clone"),
+        ExecutionContext.builder()
+            .mockMvc(mockMvc)
+            .body(dto)
+            .clientDto(TestClientDto.fromEntity(client))
+            .build());
   }
 }

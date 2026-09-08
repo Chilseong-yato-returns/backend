@@ -1,4 +1,4 @@
-package com.komentum.theme.controller;
+package com.komentum.theme.core.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.komentum.designcomponent.domain.DesignComponent;
+import com.komentum.designcomponent.enums.TypeCode;
+import com.komentum.designcomponent.enums.TypeCodeGroup;
 import com.komentum.global.utils.FileManager;
 import com.komentum.post.domain.ThemeBoard;
 import com.komentum.test.MockMvcUtils;
@@ -14,14 +16,19 @@ import com.komentum.test.data.TestDataRemover;
 import com.komentum.test.data.ThemeDataGenerator;
 import com.komentum.test.data.UserDataGenerator;
 import com.komentum.test.data.scenario.DesignComponentScenarioSupport;
+import com.komentum.test.data.scenario.DesignComponentScenarioSupport.DesignComponentScenarioResult;
 import com.komentum.test.data.scenario.PostScenarioSupport;
 import com.komentum.test.data.scenario.ThemeComponentScenarioSupport;
+import com.komentum.test.data.scenario.ThemeComponentScenarioSupport.ThemeComponentScenarioResult;
 import com.komentum.test.data.scenario.UserScenarioSupport;
+import com.komentum.test.data.scenario.UserScenarioSupport.UserScenarioResult;
 import com.komentum.test.dto.MockMvcRequestDto;
 import com.komentum.test.dto.MockMvcRequestDto.ExecutionContext;
 import com.komentum.test.dto.TestClientDto;
 import com.komentum.theme.core.domain.ThemeComponent;
+import com.komentum.theme.core.dto.ThemeComponentDto;
 import com.komentum.theme.core.dto.ThemeDetailResponse;
+import com.komentum.theme.core.dto.ThemeDetailResponse.TypeCodeInfo;
 import com.komentum.theme.core.dto.ThemePreviewDto;
 import com.komentum.user.domain.User;
 import java.util.List;
@@ -80,6 +87,11 @@ class ThemeRetrieveControllerTest {
   private TestClientDto testClient;
   private User testUser;
 
+  UserScenarioResult userResult;
+  DesignComponentScenarioResult dcResult;
+  ThemeComponentScenarioResult tcResult;
+  int tcPerUser = 3;
+
   private void assertThemePreviewDto(ThemePreviewDto themePreviewDto) {
     assertThat(themePreviewDto.getThemeComponentId()).isNotNull();
     assertThat(themePreviewDto.getThemeName()).isNotBlank();
@@ -90,10 +102,27 @@ class ThemeRetrieveControllerTest {
 
   @BeforeEach
   void setUp() {
-    themeDataGenerator.deleteTestData();
-    themeDataGenerator.generateTestData(10);
-    testUser = userDataGenerator.generateTestUser(themeDataGenerator.userEmail);
-    testClient = TestClientDto.fromEntity(testUser);
+    // stub
+    Mockito.when(fileManager.resolveFilePath(Mockito.any()))
+        .thenReturn("http://mocked-url/1234567890");
+    Mockito.when(fileManager.convertUrlToFileName(Mockito.any()))
+        .thenReturn("mocked-file-name");
+    Mockito.when(fileManager.uploadFile(Mockito.any(), Mockito.any()))
+        .thenReturn("http://mocked-url/1234567890");
+    // generate users
+    userResult = userScenarioSupport.builder()
+        .withUsers(3)
+        .build();
+    // generate design components
+    dcResult = designComponentScenarioSupport.builder(userResult.users())
+        .withCountPerUser(5)
+        .build();
+    // generate theme components
+    tcResult = themeComponentScenarioSupport.builder(userResult.users(),
+            dcResult.designComponents())
+        .withCountPerUser(tcPerUser)
+        .build();
+    System.out.println();
   }
 
   @AfterEach
@@ -102,7 +131,7 @@ class ThemeRetrieveControllerTest {
   }
 
   @Test
-  @DisplayName("")
+  @DisplayName("인증되지 않은 사용자가 모든 테마를 조회한다")
   void getAllThemes_success() throws Exception {
     // given
     int pageNumber = 1;
@@ -111,8 +140,6 @@ class ThemeRetrieveControllerTest {
     MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get("/api/themes")
         .param("page", String.valueOf(pageNumber))
         .param("size", String.valueOf(pageSize));
-    requestBuilder = mockMvcUtils.addAuthentication(requestBuilder,
-        testClient);
     // then
     mockMvc.perform(requestBuilder)
         .andExpect(status().isOk())
@@ -122,24 +149,16 @@ class ThemeRetrieveControllerTest {
   }
 
   @Test
-  @DisplayName("")
+  @DisplayName("사용자가 특정 테마를 상세 조회한다")
   void findThemeById_success() throws Exception {
     // given
-    List<DesignComponent> designComponents = designComponentScenarioSupport.builder(
-            List.of(testUser))
-        .withCountPerUser(5)
-        .build().designComponents();
-    ThemeComponent toFind = themeComponentScenarioSupport
-        .builder(List.of(testUser), designComponents)
-        .withCountPerUser(1)
-        .build().themeComponents().get(0);
+    ThemeComponent toFind = tcResult.themeComponents().get(0);
     // when
     MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get("/api/themes/{id}",
         toFind.getThemeComponentId());
-    ResultActions resultActions = mockMvcUtils.performAuthRequest(requestBuilder,
+    ResultActions resultActions = mockMvcUtils.performRequest(requestBuilder,
         ExecutionContext.builder()
             .mockMvc(mockMvc)
-            .clientDto(testClient)
             .build());
     // then
     resultActions.andExpect(status().isOk());
@@ -149,6 +168,16 @@ class ThemeRetrieveControllerTest {
     assertThat(response.getThemeName()).isEqualTo(toFind.getThemeName());
     assertThat(response.getTypeCodes()).isNotEmpty();
     assertThat(response.getStyleCodes()).isNotEmpty();
+    for (TypeCode key : response.getTypeCodes().keySet()) {
+      TypeCodeInfo typeCodeInfo = response.getTypeCodes().get(key);
+      assertThat(typeCodeInfo.getDesignComponentId()).isNotNull();
+      assertThat(typeCodeInfo.getImageUrl()).isNotBlank();
+      assertThat(typeCodeInfo.getTypeCodeGroup()).isNotNull();
+      assertThat(typeCodeInfo.getTypeCodeGroupName()).isNotBlank();
+      if (key.getTypeCodeGroup().equals(TypeCodeGroup.CHATROOM_BUBBLE)) {
+        assertThat(typeCodeInfo.getInset()).isNotNull();
+      }
+    }
   }
 
   @Test
@@ -161,49 +190,48 @@ class ThemeRetrieveControllerTest {
     MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get("/api/themes/public")
         .param("page", String.valueOf(pageNumber))
         .param("size", String.valueOf(pageSize));
-    requestBuilder = mockMvcUtils.addAuthentication(requestBuilder,
-        testClient);
     // then
     mockMvc.perform(requestBuilder)
         .andExpect(status().isOk());
   }
 
   @Test
-  @DisplayName("")
-  void getThemesByUserEmail_success() throws Exception {
+  @DisplayName("인증되지 않은 사용자가 public user Id로 테마를 조회한다")
+  void getThemeByPublicUserId_successWithoutAuthentication() throws Exception {
     // given
-    String userEmail = themeDataGenerator.userEmail;
-    int pageNumber = 1;
-    int pageSize = 3;
+    User client = userResult.getFirstUser();
+    String publicUserId = client.getPublicUserId();
+    int pageNumber = 0;
     // when
     MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get(
-            "/api/themes/user/{userEmail}",
-            userEmail)
+            "/api/themes/user/{publicUserId}",
+            publicUserId)
         .param("page", String.valueOf(pageNumber))
-        .param("size", String.valueOf(pageSize));
-    requestBuilder = mockMvcUtils.addAuthentication(requestBuilder,
-        testClient);
+        .param("size", String.valueOf(tcPerUser));
     // then
-    mockMvc.perform(requestBuilder)
+    ResultActions result = mockMvc.perform(requestBuilder)
         .andExpect(status().isOk());
+    List<ThemeComponentDto> response = mockMvcUtils.parseResponse(result, new TypeReference<>() {
+    });
+    assertThat(response).hasSize(tcPerUser);
   }
 
   @Test
-  @DisplayName("")
+  @DisplayName("인증되지 않은 사용자가 완성된 테마 목록을 조회한다")
   void getCompletedThemes_success() throws Exception {
     // given
     int pageNumber = 1;
-    int pageSize = 3;
     // when
     MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get(
             "/api/themes/completed")
         .param("page", String.valueOf(pageNumber))
-        .param("size", String.valueOf(pageSize));
-    requestBuilder = mockMvcUtils.addAuthentication(requestBuilder,
-        testClient);
+        .param("size", String.valueOf(tcPerUser));
     // then
-    mockMvc.perform(requestBuilder)
+    ResultActions result = mockMvc.perform(requestBuilder)
         .andExpect(status().isOk());
+    List<ThemeComponentDto> response = mockMvcUtils.parseResponse(result, new TypeReference<>() {
+    });
+    assertThat(response).hasSize(tcPerUser);
   }
 
   @Test
@@ -218,8 +246,6 @@ class ThemeRetrieveControllerTest {
             "/api/themes/completed/user/{userEmail}", userEmail)
         .param("page", String.valueOf(pageNumber))
         .param("size", String.valueOf(pageSize));
-    requestBuilder = mockMvcUtils.addAuthentication(requestBuilder,
-        testClient);
     // then
     mockMvc.perform(requestBuilder)
         .andExpect(status().isOk());
@@ -228,42 +254,20 @@ class ThemeRetrieveControllerTest {
   @Test
   @DisplayName("when send request, retrieve themes order by prefers")
   public void findPopularThemes_success() throws Exception {
-    // 임시 : setUp 데이터 삭제 ( 시나리오 구현 어려움 )
-    testDataRemover.deleteAll();
-    // stub : 이미지 생성 시 Mock URL 사용
-    Mockito.when(fileManager.resolveFilePath(Mockito.any()))
-        .thenReturn("http://mocked-url/1234567890");
-    // given: 사용자 4명 생성
-    List<User> users = userScenarioSupport.builder()
-        .withUsers(4)
-        .build().users();
-    // given : design component 4개 생성
-    List<DesignComponent> designComponents = designComponentScenarioSupport.builder(users)
-        .withCountPerUser(1)
-        .build().designComponents();
-    // given: theme 4개 생성
-    List<ThemeComponent> themeComponents = themeComponentScenarioSupport.builder(users,
-            designComponents)
-        .withCountPerUser(1)
-        .build().themeComponents();
-    // given: theme board를 4개 생성하고, 그 중 2개는 4개의 좋아요를 갖는다
-    var postResult = postScenarioSupport.builder(users)
+    // given: theme board를 9개 생성하고, 그 중 4개는 2개의 좋아요를 갖는다
+    List<ThemeComponent> themeComponents = tcResult.themeComponents(); // 테마 9개
+    var postResult = postScenarioSupport.builder(userResult.users())
         .withThemeBoards(themeComponents)
-        .withPrefersPerPost(4, 0.5)
+        .withPrefersPerPost(2, 0.5)
         .build();
     // when
-    User client = users.get(0);
-    List<ThemePreviewDto> response = mockMvcUtils.doAuthRequest(
-        MockMvcRequestDto.<Void, List<ThemePreviewDto>>builder()
-            .mockMvc(mockMvc)
-            .path("/api/themes/popular")
-            .httpMethod(HttpMethod.GET)
-            .clientDto(TestClientDto.fromEntity(client))
-            .statusCode(200)
-            .responseType(new TypeReference<>() {
-            })
-            .build()
-    );
+    MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get(
+        "/api/themes/popular");
+    ResultActions result = mockMvcUtils.performRequest(requestBuilder, ExecutionContext.builder()
+        .mockMvc(mockMvc)
+        .build()).andExpect(status().isOk());
+    List<ThemePreviewDto> response = mockMvcUtils.parseResponse(result, new TypeReference<>() {
+    });
     // then
     Map<Long, Long> preferCountByPost = postResult.prefers().stream()
         .collect(Collectors.groupingBy(
@@ -280,11 +284,11 @@ class ThemeRetrieveControllerTest {
                 )
             )
         ));
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 4; i++) {
       assertThemePreviewDto(response.get(i));
-      assertThat(preferCountByTheme.get(response.get(i).getThemeComponentId())).isEqualTo(4);
+      assertThat(preferCountByTheme.get(response.get(i).getThemeComponentId())).isEqualTo(2);
     }
-    for (int i = 2; i < 4; i++) {
+    for (int i = 4; i < 9; i++) {
       assertThemePreviewDto(response.get(i));
       assertThat(preferCountByTheme.get(response.get(i).getThemeComponentId())).isEqualTo(0);
     }

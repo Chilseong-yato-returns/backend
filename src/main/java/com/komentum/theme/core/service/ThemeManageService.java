@@ -5,7 +5,6 @@ import com.komentum.designcomponent.domain.ComponentType;
 import com.komentum.designcomponent.domain.DesignComponent;
 import com.komentum.designcomponent.repository.ColorStyleRepository;
 import com.komentum.global.exception.ResourceNotFoundException;
-import com.komentum.global.utils.NumberUtils;
 import com.komentum.theme.core.domain.ThemeComponent;
 import com.komentum.theme.core.domain.ThemeImage;
 import com.komentum.theme.core.domain.ThemeStyle;
@@ -87,26 +86,20 @@ public class ThemeManageService {
     );
   }
 
+  /**
+   * 지정된 이름으로 새로운 테마를 생성한다. 이름이 없으면 임의의 이름을 부여한다.
+   *
+   * @param targetUser 테마 제작자로 설정할 사용자
+   * @param themeName  테마 이름, null이거나 공백이면 임의의 이름을 사용한다
+   * @return 생성된 ThemeComponent
+   */
   @Transactional
-  public ThemeComponentDto updateTheme(Integer id, CreateThemeRequest request) {
-    // 저장된 테마 조회
-    ThemeComponent themeComponent = themeComponentRepository.findById(id)
-        .orElseThrow(() -> new ResourceNotFoundException("Theme not found with id: " + id));
-    // 기본 정보 업데이트
-    themeComponent.setThemeName(request.getThemeName());
-    themeComponent.setVersionName(request.getVersionName());
-    if (request.getIsPublic() != null) {
-      themeComponent.setIsPublic(request.getIsPublic());
+  public ThemeComponent createNewTheme(User targetUser, String themeName) {
+    ThemeComponent themeComponent = createNewTheme(targetUser);
+    if (themeName != null && !themeName.isBlank()) {
+      themeComponent.setThemeName(themeName);
     }
-    if (NumberUtils.isNumericString(themeComponent.getVersionNumber())) {
-      themeComponent.setVersionNumber(themeComponent.getVersionNumber() + 1);
-    } else {
-      throw new RuntimeException("Version number is not numeric");
-    }
-    // 테마 스타일과 이미지 갱신
-    applyThemeImageAndStyle(themeComponent, request);
-    // 결과 반환
-    return themeComponentMapper.convertToDto(themeComponentRepository.save(themeComponent));
+    return themeComponent;
   }
 
   @Transactional

@@ -60,12 +60,24 @@ public class MockMvcUtils {
   public <E> ResultActions performAuthRequest(
       MockHttpServletRequestBuilder requestBuilder,
       ExecutionContext<E> context) throws Exception {
-    // params, body 설정
+    if (context.getClientDto() == null) {
+      throw new IllegalArgumentException("ClientDto is required");
+    }
+    return performRequest(requestBuilder, context);
+  }
+
+  /**
+   * 인증 혹은 인증이 필요하지 않은 요청을 수행한다.
+   * */
+  public <E> ResultActions performRequest(
+      MockHttpServletRequestBuilder requestBuilder,
+      ExecutionContext<E> context) throws Exception {
     ExecutionContext.addRequestInfoOnRequest(requestBuilder, context, objectMapper);
-    // content-type 설정 ( 추후 별도 커스텀 헤더 필요 시, addRequestInfoOnRequest로 합칠 예정 )
+    if (context.getClientDto() != null) {
+      requestBuilder = addAuthentication(requestBuilder, context.getClientDto());
+    }
     requestBuilder.contentType(DEFAULT_CONTENT_TYPE);
-    return context.getMockMvc()
-        .perform(addAuthentication(requestBuilder, context.getClientDto()));
+    return context.getMockMvc().perform(requestBuilder);
   }
 
   /**

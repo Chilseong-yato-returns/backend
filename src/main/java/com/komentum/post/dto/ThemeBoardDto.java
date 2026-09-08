@@ -5,6 +5,7 @@ import com.komentum.post.dto.TagDto.TagResponse;
 import com.komentum.post.dto.TagDto.TagUpdateDto;
 import com.komentum.theme.core.dto.ThemeDesignAssetDto;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -120,9 +121,11 @@ public class ThemeBoardDto {
   public static class ThemeBoardCreateDto {
 
     @Schema(description = "게시글 ID")
+    @Size(max = 100, message = "title must be at most 100 characters")
     String title;
 
     @Schema(description = "게시글 내용")
+    @Size(max = 2000, message = "content must be at most 2000 characters")
     String content;
 
     @Schema(description = "생성할 게시글의 태그 목록")
@@ -155,9 +158,11 @@ public class ThemeBoardDto {
   public static class ThemeBoardUpdateDto {
 
     @Schema(description = "게시글 제목")
+    @Size(max = 100, message = "title must be at most 100 characters")
     String title;
 
     @Schema(description = "게시글 내용")
+    @Size(max = 2000, message = "content must be at most 2000 characters")
     String content;
 
     @Schema(description = "게시글의 태그 목록 ( 요청으로 받는 tag 목록으로 덮어쓰기 진행 )")

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -113,7 +114,7 @@ public class DesignBoardController {
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @Operation(summary = "현재 인증된 사용자가 디자인 에셋 게시글을 작성한다")
   public ResponseEntity<DesignBoardDetailDto> createDesignBoard(
-      @RequestPart("boardInfo") DesignBoardCreateDto createDto,
+      @Valid @RequestPart("boardInfo") DesignBoardCreateDto createDto,
       @RequestPart(value = "previewImage", required = false) MultipartFile previewImage,
       @AuthenticationPrincipal CustomUserDetails userDetails
   ) {
@@ -130,7 +131,7 @@ public class DesignBoardController {
   @Operation(summary = "현재 인증된 사용자가 자신이 소유한 ID=postId인 디자인 에셋 게시글을 수정한다")
   public ResponseEntity<DesignBoardDetailDto> updateDesignBoard(
       @PathVariable Long postId,
-      @RequestPart(value = "boardInfo") DesignBoardUpdateDto updateDto,
+      @Valid @RequestPart(value = "boardInfo") DesignBoardUpdateDto updateDto,
       @RequestPart(value = "previewImage", required = false) MultipartFile previewImage,
       @AuthenticationPrincipal CustomUserDetails userDetails
   ) {

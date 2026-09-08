@@ -4,6 +4,7 @@ import com.komentum.post.dto.TagDto.TagCreateDto;
 import com.komentum.post.dto.TagDto.TagResponse;
 import com.komentum.post.dto.TagDto.TagUpdateDto;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -121,9 +122,11 @@ public class DesignBoardDto {
   public static class DesignBoardCreateDto {
 
     @Schema(description = "디자인 에셋 게시글 제목")
+    @Size(max = 100, message = "title must be at most 100 characters")
     String title;
 
     @Schema(description = "디자인 에셋 게시글 내용")
+    @Size(max = 2000, message = "content must be at most 2000 characters")
     String content;
 
     @Schema(description = "디자인 에셋 게시글에 대한 디자인 에셋 데이터 ID")
@@ -157,9 +160,11 @@ public class DesignBoardDto {
   public static class DesignBoardUpdateDto {
 
     @Schema(description = "수정할 디자인 에셋 게시글 제목(null 가능)", example = "수정할 디자인 에셋 게시글 제목(null 가능)")
+    @Size(max = 100, message = "title must be at most 100 characters")
     String title;
 
     @Schema(description = "수정할 디자인 에셋 게시글 내용(null 가능)", example = "수정할 디자인 에셋 게시글 내용(null 가능)")
+    @Size(max = 2000, message = "content must be at most 2000 characters")
     String content;
 
     @Schema(description = "현재 디자인 에셋 목록으로 디자인 에셋 게시글을 덮어쓴다(null 허용)")

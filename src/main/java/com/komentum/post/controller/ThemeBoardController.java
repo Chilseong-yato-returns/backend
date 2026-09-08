@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -142,7 +143,7 @@ public class ThemeBoardController {
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @Operation(summary = "인증된 사용자가 테마 게시글을 생성한다")
   public ResponseEntity<ThemeBoardDetailDto> createPost(
-      @RequestPart(value = "boardInfo") ThemeBoardCreateDto createDto,
+      @Valid @RequestPart(value = "boardInfo") ThemeBoardCreateDto createDto,
       @RequestPart(value = "previewImage", required = false) MultipartFile profileImage,
       @AuthenticationPrincipal CustomUserDetails userDetails) {
     return ResponseEntity.ok(
@@ -159,7 +160,7 @@ public class ThemeBoardController {
   @PutMapping(value = "/{postId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @Operation(summary = "인증된 사용자가 자신이 소유한 ID=postId인 테마 게시글을 수정한다")
   public ResponseEntity<ThemeBoardDetailDto> updatePost(@PathVariable Long postId,
-      @RequestPart(value = "boardInfo") ThemeBoardUpdateDto updateDto,
+      @Valid @RequestPart(value = "boardInfo") ThemeBoardUpdateDto updateDto,
       @RequestPart(value = "previewImage", required = false) MultipartFile previewImage,
       @AuthenticationPrincipal CustomUserDetails userDetails) {
     return ResponseEntity.ok(

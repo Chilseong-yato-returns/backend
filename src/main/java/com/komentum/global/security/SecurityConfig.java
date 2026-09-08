@@ -76,7 +76,7 @@ public class SecurityConfig {
               .hasRole(UserRole.ADMIN.name());
           if (securityProfileProperties.getAdminOnly() != null) {
             auth.requestMatchers(createRequestMatchers(securityProfileProperties.getAdminOnly()))
-                .permitAll();
+                .hasRole(UserRole.ADMIN.name());
           }
           // 로컬 스토리지를 사용하는 경우 업로드된 파일을 정적 리소스로 직접 서빙하므로 업로드 경로에 대한 GET 요청을 허용
           if (fileStorageProperty.getStorage() == Storage.LOCAL) {

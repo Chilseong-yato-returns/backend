@@ -19,7 +19,8 @@ class TokenCookieManagerTest {
       1000L,
       1000L,
       "http://localhost:3000",
-      false
+      false,
+      "Lax"
   );
 
   @BeforeEach

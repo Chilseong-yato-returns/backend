@@ -1,17 +1,18 @@
 package com.komentum.global.security;
 
 import com.komentum.config.WebConfig;
+import com.komentum.global.dto.SecurityRule;
 import com.komentum.global.properties.FileStorageProperty;
 import com.komentum.global.properties.FileStorageProperty.Storage;
+import com.komentum.global.properties.SecurityProfileProperties;
 import com.komentum.global.properties.SecurityProperties;
-import com.komentum.global.properties.SecurityProperties.SecurityRule;
+import com.komentum.global.properties.ServerProperties;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -34,14 +35,17 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-@EnableConfigurationProperties({SecurityProperties.class, FileStorageProperty.class})
 public class SecurityConfig {
 
   private final JwtAuthFilter jwtAuthFilter;
 
+  private final ServerProperties serverProperties;
+
   private final SecurityProperties securityProperties;
 
   private final FileStorageProperty fileStorageProperty;
+
+  private final SecurityProfileProperties securityProfileProperties;
 
   private final CustomOauth2UserService customOauth2UserService;
 
@@ -63,9 +67,17 @@ public class SecurityConfig {
           // white list request matchers 추가
           auth.requestMatchers(createRequestMatchers(securityProperties.getPermitAll()))
               .permitAll();
+          if (securityProfileProperties.getPermitAll() != null) {
+            auth.requestMatchers(createRequestMatchers(securityProfileProperties.getPermitAll()))
+                .permitAll();
+          }
           // admin only request matchers 추가
           auth.requestMatchers(createRequestMatchers(securityProperties.getAdminOnly()))
               .hasRole(UserRole.ADMIN.name());
+          if (securityProfileProperties.getAdminOnly() != null) {
+            auth.requestMatchers(createRequestMatchers(securityProfileProperties.getAdminOnly()))
+                .permitAll();
+          }
           // 로컬 스토리지를 사용하는 경우 업로드된 파일을 정적 리소스로 직접 서빙하므로 업로드 경로에 대한 GET 요청을 허용
           if (fileStorageProperty.getStorage() == Storage.LOCAL) {
             auth.requestMatchers(HttpMethod.GET, WebConfig.UPLOAD_URL_PREFIX + "/**").permitAll();
@@ -87,19 +99,23 @@ public class SecurityConfig {
 
   @Bean
   UrlBasedCorsConfigurationSource corsConfigurationSource() {
-    // 🔥 디버깅 로그
-    log.info("===== CORS Allowed Origins =====");
-    Arrays.stream(securityProperties.getAllowedOriginList())
-        .forEach(log::info);
-    log.info("================================");
+    // common CORS
     CorsConfiguration configuration = new CorsConfiguration();
     configuration.setAllowedHeaders(List.of("*"));
     configuration.setAllowedMethods(List.of("*"));
     configuration.setAllowedOriginPatterns(
         Arrays.asList(securityProperties.getAllowedOriginList()));
     configuration.setAllowCredentials(true);
+    // POST /dev/users/auth CORS
+    CorsConfiguration devCorsConfiguration = new CorsConfiguration();
+    devCorsConfiguration.setAllowedHeaders(List.of("*"));
+    devCorsConfiguration.setAllowedMethods(List.of("POST"));
+    devCorsConfiguration.setAllowedOriginPatterns(List.of(serverProperties.getExternalDomain()));
+    devCorsConfiguration.setAllowCredentials(true);
+    // apply CORS configuration
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
+    source.registerCorsConfiguration("/dev/users/auth", devCorsConfiguration);
     return source;
   }
 

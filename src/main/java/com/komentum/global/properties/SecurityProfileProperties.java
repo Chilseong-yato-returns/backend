@@ -10,12 +10,9 @@ import org.springframework.http.HttpMethod;
 
 @Getter
 @RequiredArgsConstructor
-@ConfigurationProperties(prefix = "security")
-public class SecurityProperties {
+@ConfigurationProperties(prefix = "security.profile")
+public class SecurityProfileProperties {
 
   private final Map<HttpMethod, List<SecurityRule>> permitAll;
   private final Map<HttpMethod, List<SecurityRule>> adminOnly;
-  private final String[] allowedOriginList;
-
 }
-

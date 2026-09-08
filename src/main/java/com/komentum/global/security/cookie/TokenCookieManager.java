@@ -20,7 +20,7 @@ public class TokenCookieManager {
         .secure(authProperty.getWithHttps())
         .path("/")
         .maxAge(maxAge)
-        .sameSite("Strict")
+        .sameSite(authProperty.getSameSite())
         .build();
   }
 
@@ -31,7 +31,7 @@ public class TokenCookieManager {
         .secure(authProperty.getWithHttps())
         .path("/")
         .maxAge(maxAge)
-        .sameSite("Strict")
+        .sameSite(authProperty.getSameSite())
         .build();
   }
 

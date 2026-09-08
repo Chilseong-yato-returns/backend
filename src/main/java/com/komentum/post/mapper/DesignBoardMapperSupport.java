@@ -66,6 +66,7 @@ public class DesignBoardMapperSupport {
         .tags(tags.stream().map(TagResponse::from).toList())
         .liked(detail.isLiked())
         .bookmarked(detail.isBookmarked())
+        .following(detail.isFollowing())
         .profileImage(detail.getProfileImage())
         .componentTypes(componentTypes)
         .build();

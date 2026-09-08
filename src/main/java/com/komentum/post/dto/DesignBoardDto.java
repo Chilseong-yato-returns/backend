@@ -58,6 +58,9 @@ public class DesignBoardDto {
     @Schema(description = "현재 사용자의 북마크 저장 여부")
     private boolean bookmarked;
 
+    @Schema(description = "현재 사용자의 게시글 작성자 팔로우 여부")
+    private boolean following;
+
     @Schema(description = "게시글 작성자 프로필 이미지 URL")
     private String profileImage;
 

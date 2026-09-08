@@ -11,6 +11,7 @@ import com.komentum.post.dto.PostSummary;
 import com.komentum.post.dto.query.PostQuery;
 import com.komentum.post.service.enums.CategoryType;
 import com.komentum.global.exception.ResourceNotFoundException;
+import com.komentum.user.domain.QFollow;
 import com.komentum.user.domain.QUser;
 import com.komentum.user.domain.User;
 import com.querydsl.core.types.ConstructorExpression;
@@ -201,6 +202,25 @@ public class PostRepositorySupport {
             categoryPost.post.eq(post),
             categoryPost.category.owner.eq(user),
             categoryPost.category.categoryType.eq(CategoryType.BOOKMARK)
+        )
+        .exists();
+  }
+
+  /**
+   * 현재 사용자가 게시글 작성자를 팔로우하는지 확인하는 EXISTS 표현식을 생성한다.
+   *
+   * @param author 게시글 작성자 경로
+   * @param client 현재 사용자
+   * @return 현재 사용자가 게시글 작성자를 팔로우하면 true인 표현식
+   */
+  public BooleanExpression isFollowing(QUser author, User client) {
+    QFollow follow = QFollow.follow;
+    return JPAExpressions
+        .selectOne()
+        .from(follow)
+        .where(
+            follow.follower.eq(client),
+            follow.followee.eq(author)
         )
         .exists();
   }

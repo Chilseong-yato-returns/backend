@@ -39,9 +39,12 @@ import com.komentum.test.dto.TestClientDto;
 import com.komentum.test.dto.TestParams;
 import com.komentum.theme.core.domain.ThemeComponent;
 import com.komentum.theme.core.dto.ThemeDesignAssetDto;
+import com.komentum.user.domain.Follow;
 import com.komentum.user.domain.User;
+import com.komentum.user.repository.FollowRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -95,6 +98,9 @@ class ThemeBoardControllerTest {
 
   @Autowired
   private FileManager fileManager;
+
+  @Autowired
+  private FollowRepository followRepository;
 
   private final int maxPreferPerPost = 3;
   private User testClient;
@@ -430,6 +436,37 @@ class ThemeBoardControllerTest {
   }
 
   @Test
+  @DisplayName("테마 게시글 단건 상세 조회 시 현재 사용자의 작성자 팔로우 여부를 반환한다")
+  void findThemeBoardByPostId_returnsFollowingStatus() throws Exception {
+    // given
+    ThemeBoard targetThemeBoard = postScenarioResult.themeBoards().get(0);
+    User author = targetThemeBoard.getPost().getUser();
+    User followingClient = userScenarioResult.users().stream()
+        .filter(user -> !user.getUserId().equals(author.getUserId()))
+        .findFirst()
+        .orElseThrow();
+    User nonFollowingClient = userScenarioResult.users().stream()
+        .filter(user -> !user.getUserId().equals(author.getUserId()))
+        .filter(user -> !user.getUserId().equals(followingClient.getUserId()))
+        .findFirst()
+        .orElseThrow();
+    followRepository.saveAndFlush(new Follow(followingClient, author));
+    // when & then
+    mockMvc.perform(mockMvcUtils.addAuthentication(
+            get("/api/theme-boards/{postId}", targetThemeBoard.getPost().getPostId()),
+            TestClientDto.fromEntity(followingClient)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.following").exists())
+        .andExpect(jsonPath("$.following").value(true));
+    mockMvc.perform(mockMvcUtils.addAuthentication(
+            get("/api/theme-boards/{postId}", targetThemeBoard.getPost().getPostId()),
+            TestClientDto.fromEntity(nonFollowingClient)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.following").exists())
+        .andExpect(jsonPath("$.following").value(false));
+  }
+
+  @Test
   @DisplayName("If a pinned post ID is provided, place that post at the top of the first page and return only theme boards written by the same author.")
   void findThemeBoardDetails_ifPinnedPostIdExists() throws Exception {
     // given
@@ -467,6 +504,40 @@ class ThemeBoardControllerTest {
     for (ThemeBoardDetailDto dto : response) {
       assertThemeBoardDetail(dto);
     }
+  }
+
+  @Test
+  @DisplayName("테마 게시글 상세 목록 조회 시 현재 사용자의 작성자 팔로우 여부를 반환한다")
+  void findThemeBoardDetails_returnsFollowingStatus() throws Exception {
+    // given
+    ThemeBoard targetThemeBoard = postScenarioResult.themeBoards().get(0);
+    Post targetPost = targetThemeBoard.getPost();
+    User author = targetPost.getUser();
+    User followingClient = userScenarioResult.users().stream()
+        .filter(user -> !user.getUserId().equals(author.getUserId()))
+        .findFirst()
+        .orElseThrow();
+    User nonFollowingClient = userScenarioResult.users().stream()
+        .filter(user -> !user.getUserId().equals(author.getUserId()))
+        .filter(user -> !user.getUserId().equals(followingClient.getUserId()))
+        .findFirst()
+        .orElseThrow();
+    followRepository.saveAndFlush(new Follow(followingClient, author));
+    MultiValueMap<String, String> params = TestParams.withPaging(0, 1);
+    params.add("pinnedPostId", targetPost.getPostId().toString());
+    // when & then
+    mockMvc.perform(mockMvcUtils.addAuthentication(
+            get("/api/theme-boards/details").params(params),
+            TestClientDto.fromEntity(followingClient)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].following").exists())
+        .andExpect(jsonPath("$[0].following").value(true));
+    mockMvc.perform(mockMvcUtils.addAuthentication(
+            get("/api/theme-boards/details").params(params),
+            TestClientDto.fromEntity(nonFollowingClient)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].following").exists())
+        .andExpect(jsonPath("$[0].following").value(false));
   }
 
   @Test
@@ -610,9 +681,11 @@ class ThemeBoardControllerTest {
         .themeComponents();
     ThemeComponent targetTheme = nonBoardThemes.get(0);
     String testPreviewImageUrl = UUID.randomUUID().toString();
+    String expectedTitle = "t".repeat(100);
+    String expectedContent = "c".repeat(2000);
     ThemeBoardCreateDto createDto = ThemeBoardCreateDto.builder()
-        .title(UUID.randomUUID().toString())
-        .content(UUID.randomUUID().toString())
+        .title(expectedTitle)
+        .content(expectedContent)
         .themeComponentId(targetTheme.getThemeComponentId())
         .publicFlag(true)
         .postTags(postTags)
@@ -643,7 +716,48 @@ class ThemeBoardControllerTest {
     // then
     assertThat(response.getTags().stream().map(TagResponse::getTagName))
         .containsExactlyInAnyOrderElementsOf(tagNames);
+    assertThat(response.getTitle()).isEqualTo(expectedTitle);
+    assertThat(response.getContent()).isEqualTo(expectedContent);
+    Post savedPost = postRepository.findById(response.getPostId()).orElseThrow();
+    assertThat(savedPost.getTitle()).isEqualTo(expectedTitle);
+    assertThat(savedPost.getContent()).isEqualTo(expectedContent);
     assertThemeBoardDetail(response);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"title", "content"})
+  @DisplayName("테마 게시글 생성 시 제목 또는 본문이 최대 길이를 초과하면 400을 반환한다")
+  void createPost_exceedingTextLimit_returnsBadRequest(String invalidField) throws Exception {
+    // given
+    ThemeComponent targetTheme = themeComponentScenarioSupport.builder(
+            userScenarioResult.users(), designComponentScenarioResult.designComponents())
+        .withCountPerUser(1)
+        .build()
+        .themeComponents()
+        .get(0);
+    ThemeBoardCreateDto createDto = ThemeBoardCreateDto.builder()
+        .title("title".equals(invalidField) ? "t".repeat(101) : "t".repeat(100))
+        .content("content".equals(invalidField) ? "c".repeat(2001) : "c".repeat(2000))
+        .themeComponentId(targetTheme.getThemeComponentId())
+        .publicFlag(true)
+        .postTags(List.of())
+        .build();
+    MockMultipartFile boardInfo = MockMultipartFileUtils
+        .generateJsonFormData("boardInfo", createDto);
+    // when & then
+    Map<String, String> response = mockMvcUtils.doAuthMultipartRequest(
+        MockMvcMultipartRequestDto.<Map<String, String>>builder()
+            .mockMvc(mockMvc)
+            .path("/api/theme-boards")
+            .httpMethod(HttpMethod.POST)
+            .clientDto(TestClientDto.fromEntity(testClient))
+            .formDataList(List.of(boardInfo))
+            .statusCode(400)
+            .responseType(new TypeReference<>() {
+            })
+            .build()
+    );
+    assertThat(response).containsKey(invalidField);
   }
 
   @Test
@@ -661,8 +775,11 @@ class ThemeBoardControllerTest {
             .build())
         .toList();
     User author = toUpdate.getUser();
+    String expectedTitle = "t".repeat(100);
+    String expectedContent = "c".repeat(2000);
     ThemeBoardUpdateDto updateDto = ThemeBoardUpdateDto.builder()
-        .title("updated-title-test")
+        .title(expectedTitle)
+        .content(expectedContent)
         .postTags(postTags)
         .build();
     MockMultipartFile testPreviewImage = MockMultipartFileUtils
@@ -692,7 +809,41 @@ class ThemeBoardControllerTest {
     assertThat(response.getTags().stream().map(TagResponse::getTagName))
         .containsExactlyInAnyOrderElementsOf(tagNames);
     assertThat(response.getPreviewImageUrl()).isEqualTo(List.of(testPreviewImageUrl));
+    assertThat(response.getTitle()).isEqualTo(expectedTitle);
+    assertThat(response.getContent()).isEqualTo(expectedContent);
+    Post savedPost = postRepository.findById(response.getPostId()).orElseThrow();
+    assertThat(savedPost.getTitle()).isEqualTo(expectedTitle);
+    assertThat(savedPost.getContent()).isEqualTo(expectedContent);
     assertThemeBoardDetail(response);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"title", "content"})
+  @DisplayName("테마 게시글 수정 시 제목 또는 본문이 최대 길이를 초과하면 400을 반환한다")
+  void updatePost_exceedingTextLimit_returnsBadRequest(String invalidField) throws Exception {
+    // given
+    Post toUpdate = postScenarioResult.posts().get(0);
+    ThemeBoardUpdateDto updateDto = ThemeBoardUpdateDto.builder()
+        .title("title".equals(invalidField) ? "t".repeat(101) : "t".repeat(100))
+        .content("content".equals(invalidField) ? "c".repeat(2001) : "c".repeat(2000))
+        .postTags(List.of())
+        .build();
+    MockMultipartFile boardInfo = MockMultipartFileUtils
+        .generateJsonFormData("boardInfo", updateDto);
+    // when & then
+    Map<String, String> response = mockMvcUtils.doAuthMultipartRequest(
+        MockMvcMultipartRequestDto.<Map<String, String>>builder()
+            .mockMvc(mockMvc)
+            .path(String.format("/api/theme-boards/%d", toUpdate.getPostId()))
+            .httpMethod(HttpMethod.PUT)
+            .clientDto(TestClientDto.fromEntity(toUpdate.getUser()))
+            .formDataList(List.of(boardInfo))
+            .statusCode(400)
+            .responseType(new TypeReference<>() {
+            })
+            .build()
+    );
+    assertThat(response).containsKey(invalidField);
   }
 
   @Test

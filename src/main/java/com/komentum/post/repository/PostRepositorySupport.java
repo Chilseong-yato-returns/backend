@@ -180,7 +180,17 @@ public class PostRepositorySupport {
     return postType == null ? null : post.postType.eq(postType);
   }
 
+  /**
+   * 조회 기준 사용자의 게시글 좋아요 여부를 확인하는 표현식을 생성한다.
+   *
+   * @param post 게시글 경로
+   * @param user 조회 기준 사용자 (null 허용)
+   * @return 조회 기준 사용자가 null이면 false, 아니면 좋아요 관계의 존재 여부
+   */
   public BooleanExpression isPreferred(QPost post, User user) {
+    if (user == null) {
+      return Expressions.FALSE;
+    }
     QPrefer prefer = QPrefer.prefer;
     return JPAExpressions
         .selectOne()
@@ -192,7 +202,17 @@ public class PostRepositorySupport {
         .exists();
   }
 
+  /**
+   * 조회 기준 사용자의 게시글 북마크 여부를 확인하는 표현식을 생성한다.
+   *
+   * @param post 게시글 경로
+   * @param user 조회 기준 사용자 (null 허용)
+   * @return 조회 기준 사용자가 null이면 false, 아니면 북마크 관계의 존재 여부
+   */
   public BooleanExpression isBookmarked(QPost post, User user) {
+    if (user == null) {
+      return Expressions.FALSE;
+    }
     QCategoryPost categoryPost = QCategoryPost.categoryPost;
 
     return JPAExpressions

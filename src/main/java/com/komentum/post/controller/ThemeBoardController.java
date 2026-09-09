@@ -96,22 +96,34 @@ public class ThemeBoardController {
    * 게시글 ID를 기반으로 테마 게시글 상세 조회
    *
    * @param postId 게시글 ID
+   * @param withImages 테마 이미지 포함 여부
+   * @param userDetails 현재 사용자 인증 정보 (비인증 요청이면 null)
    * @return 게시글 상세 정보 반환
    */
   @GetMapping("/{postId}")
-  @Operation(summary = "인증된 사용자가 ID=postId인 게시글을 상세 조회한다")
+  @Operation(summary = "인증 여부와 관계없이 ID=postId인 테마 게시글을 상세 조회한다")
   public ResponseEntity<ThemeBoardDetailDto> findThemeBoardByPostId(
       @PathVariable Long postId,
       @RequestParam(value = "withImages", required = false) Boolean withImages,
       @AuthenticationPrincipal CustomUserDetails userDetails) {
     return ResponseEntity.ok(
-        themeBoardManagementFacade.findThemeBoardDetail(postId, userDetails.getUsername(),
+        themeBoardManagementFacade.findThemeBoardDetail(postId,
+            userDetails == null ? null : userDetails.getUsername(),
             withImages));
   }
 
+  /**
+   * 테마 게시글 상세 정보 목록을 조회한다.
+   *
+   * @param pinnedPostId 첫 페이지 최상단에 고정할 게시글 ID
+   * @param withImages 테마 이미지 포함 여부
+   * @param pageable 조회할 페이지 정보
+   * @param userDetails 현재 사용자 인증 정보 (비인증 요청이면 null)
+   * @return 테마 게시글 상세 정보 목록
+   */
   @GetMapping("/details")
   @Operation(
-      summary = "인증된 사용자가 테마 게시글 상세 목록을 조회한다",
+      summary = "인증 여부와 관계없이 테마 게시글 상세 목록을 조회한다",
       description = """
           
           [동작 방식]
@@ -130,7 +142,7 @@ public class ThemeBoardController {
       @AuthenticationPrincipal CustomUserDetails userDetails
   ) {
     List<ThemeBoardDetailDto> response = themeBoardManagementFacade.findThemeBoardDetails(pageable,
-        pinnedPostId, userDetails.getUsername(), withImages);
+        pinnedPostId, userDetails == null ? null : userDetails.getUsername(), withImages);
     return ResponseEntity.ok(response);
   }
 

@@ -70,23 +70,32 @@ public class DesignBoardController {
 
   /**
    * 특정 디자인 에셋 게시글 상세 조회
+   *
+   * @param postId 게시글 ID
+   * @param userDetails 인증된 사용자 정보 (비인증 요청은 null)
    */
   @GetMapping("/{postId}")
-  @Operation(summary = "현재 인증된 사용자가 ID=postId인 특정 디자인 에셋 게시글을 조회한다")
+  @Operation(summary = "인증 여부와 관계없이 ID=postId인 특정 디자인 에셋 게시글을 조회한다")
   public ResponseEntity<DesignBoardDetailDto> findDesignBoardDetail(
       @PathVariable Long postId,
       @AuthenticationPrincipal CustomUserDetails userDetails
   ) {
     return ResponseEntity.ok(
-        designBoardManagementFacade.findBoardDetail(postId, userDetails.getPublicUserId()));
+        designBoardManagementFacade.findBoardDetail(postId,
+            userDetails == null ? null : userDetails.getPublicUserId()));
   }
 
   /**
    * 디자인 에셋 게시글 상세 정보 리스트 조회
+   *
+   * @param pinnedPostId 첫 페이지 최상단에 고정할 게시글 ID
+   * @param pageable 조회할 페이지 정보
+   * @param userDetails 인증된 사용자 정보 (비인증 요청은 null)
+   * @return 디자인 에셋 게시글 상세 정보 목록
    * */
   @GetMapping("/details")
   @Operation(
-      summary = "인증된 사용자가 디자인 에셋 게시글 상세 목록을 조회한다",
+      summary = "인증 여부와 관계없이 디자인 에셋 게시글 상세 목록을 조회한다",
       description = """
           
           [동작 방식]
@@ -104,7 +113,8 @@ public class DesignBoardController {
       @AuthenticationPrincipal CustomUserDetails userDetails
   ) {
     List<DesignBoardDetailDto> response = designBoardManagementFacade
-        .findBoardDetails(pageable, pinnedPostId, userDetails.getUsername());
+        .findBoardDetails(pageable, pinnedPostId,
+            userDetails == null ? null : userDetails.getUsername());
     return ResponseEntity.ok(response);
   }
 

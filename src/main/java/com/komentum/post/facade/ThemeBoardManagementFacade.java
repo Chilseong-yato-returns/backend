@@ -70,6 +70,8 @@ public class ThemeBoardManagementFacade {
    * 게시글 ID를 기반으로 테마 게시글 상세 정보 반환
    *
    * @param postId 게시글 ID
+   * @param userIdentifier 현재 사용자 식별자 (비인증 요청이면 null)
+   * @param withImages 테마 이미지 포함 여부
    * @return ThemeBoardDetailDto 테마 게시글 상세 정보
    *
    */
@@ -83,12 +85,14 @@ public class ThemeBoardManagementFacade {
    * 게시글 상세 정보 목록 조회
    * @param pageable 페이지 정보
    * @param pinnedPostId 맨 앞에 제시할 게시글 정보
-   * @param userIdentifier 현재 사용자 식별자
+   * @param userIdentifier 현재 사용자 식별자 (비인증 요청이면 null)
+   * @param withImages 테마 이미지 포함 여부
+   * @return 테마 게시글 상세 정보 목록
    * */
   @Transactional(readOnly = true)
   public List<ThemeBoardDetailDto> findThemeBoardDetails(Pageable pageable, Long pinnedPostId,
       String userIdentifier, Boolean withImages) {
-    User client = userEntityFinder.findUserEntity(userIdentifier);
+    User client = userIdentifier == null ? null : userEntityFinder.findUserEntity(userIdentifier);
     // detail DTO 목록 조회
     Post pinnedPost = pinnedPostId == null ?
         null :

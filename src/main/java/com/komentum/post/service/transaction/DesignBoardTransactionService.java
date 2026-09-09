@@ -45,12 +45,19 @@ public class DesignBoardTransactionService {
   private final DesignBoardRepository designBoardRepository;
   private final DesignComponentService designComponentService;
 
+  /**
+   * 게시글 ID로 디자인 에셋 게시글 상세 정보를 조회한다.
+   *
+   * @param postId 게시글 ID
+   * @param userIdentifier 사용자 식별자 (비인증 요청은 null)
+   * @return 디자인 에셋 게시글 상세 정보
+   */
   @Transactional(readOnly = true)
   public DesignBoardDetailDto findDesignBoardDetail(Long postId, String userIdentifier) {
     if (!designBoardRepository.existsByPost_PostId(postId)) {
       throw new EntityNotFoundException("cannot find design board with post id = " + postId);
     }
-    User client = userEntityFinder.findUserEntity(userIdentifier);
+    User client = userIdentifier == null ? null : userEntityFinder.findUserEntity(userIdentifier);
     DesignBoardQuery.Detail detail = designBoardRepositorySupport
         .findDetailByPostId(postId, client);
     List<Tag> tags = tagService.findAllByPostId(postId);

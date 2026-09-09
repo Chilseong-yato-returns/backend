@@ -412,6 +412,7 @@ public class DesignBoardControllerTest {
     // given
     List<Long> expectedPostIds = postResult.designBoards().stream()
         .map(designBoard -> designBoard.getPost().getPostId())
+        .distinct()
         .toList();
     MultiValueMap<String, String> params = TestParams.withPaging(0, expectedPostIds.size());
     // when

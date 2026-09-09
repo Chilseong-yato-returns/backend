@@ -49,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles("automated-test")
 class ThemeBuildServiceTest {
 
   @Autowired

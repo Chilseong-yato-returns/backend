@@ -62,6 +62,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.util.MultiValueMap;
 
 @SpringBootTest
@@ -435,6 +436,34 @@ class ThemeBoardControllerTest {
     assertThat(response.getThemeDesignAssetDtoList()).isNull();
   }
 
+  /**
+   * 인증 정보 없이 테마 게시글 단건 상세를 조회할 수 있는지 검증한다.
+   */
+  @Test
+  @DisplayName("비인증 사용자는 테마 게시글 단건 상세를 조회할 수 있다")
+  void findThemeBoardByPostId_withoutAuthentication_returnsDetail() throws Exception {
+    // given
+    ThemeBoard targetThemeBoard = postScenarioResult.themeBoards().get(0);
+    Post targetPost = targetThemeBoard.getPost();
+    // when
+    ResultActions result = mockMvc.perform(
+            get("/api/theme-boards/{postId}", targetPost.getPostId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.liked").exists())
+        .andExpect(jsonPath("$.liked").value(false))
+        .andExpect(jsonPath("$.bookmarked").exists())
+        .andExpect(jsonPath("$.bookmarked").value(false))
+        .andExpect(jsonPath("$.following").exists())
+        .andExpect(jsonPath("$.following").value(false));
+    ThemeBoardDetailDto response = mockMvcUtils.parseResponse(result, new TypeReference<>() {
+    });
+    // then
+    assertThemeBoardDetail(response);
+    assertThat(response.getPostId()).isEqualTo(targetPost.getPostId());
+    assertThat(response.getTitle()).isEqualTo(targetPost.getTitle());
+    assertThat(response.getContent()).isEqualTo(targetPost.getContent());
+  }
+
   @Test
   @DisplayName("테마 게시글 단건 상세 조회 시 현재 사용자의 작성자 팔로우 여부를 반환한다")
   void findThemeBoardByPostId_returnsFollowingStatus() throws Exception {
@@ -503,6 +532,42 @@ class ThemeBoardControllerTest {
     assertThat(response).hasSize(pageSize);
     for (ThemeBoardDetailDto dto : response) {
       assertThemeBoardDetail(dto);
+    }
+  }
+
+  /**
+   * 인증 정보 없이 기본 페이징 조건으로 테마 게시글 상세 목록을 조회할 수 있는지 검증한다.
+   */
+  @Test
+  @DisplayName("비인증 사용자는 기본 테마 게시글 상세 목록을 조회할 수 있다")
+  void findThemeBoardDetails_withoutAuthentication_returnsDefaultPage() throws Exception {
+    // given
+    int pageSize = postScenarioResult.themeBoards().size();
+    List<Long> expectedPostIds = postScenarioResult.themeBoards().stream()
+        .map(themeBoard -> themeBoard.getPost().getPostId())
+        .toList();
+    // when
+    ResultActions result = mockMvc.perform(
+            get("/api/theme-boards/details").params(TestParams.withPaging(0, pageSize)))
+        .andExpect(status().isOk());
+    List<ThemeBoardDetailDto> response = mockMvcUtils.parseResponse(result,
+        new TypeReference<>() {
+        });
+    // then
+    assertThat(response)
+        .isNotEmpty()
+        .hasSize(pageSize)
+        .extracting(ThemeBoardDetailDto::getPostId)
+        .containsExactlyInAnyOrderElementsOf(expectedPostIds);
+    for (int i = 0; i < response.size(); i++) {
+      assertThemeBoardDetail(response.get(i));
+      result
+          .andExpect(jsonPath("$[" + i + "].liked").exists())
+          .andExpect(jsonPath("$[" + i + "].liked").value(false))
+          .andExpect(jsonPath("$[" + i + "].bookmarked").exists())
+          .andExpect(jsonPath("$[" + i + "].bookmarked").value(false))
+          .andExpect(jsonPath("$[" + i + "].following").exists())
+          .andExpect(jsonPath("$[" + i + "].following").value(false));
     }
   }
 

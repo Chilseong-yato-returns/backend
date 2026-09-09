@@ -207,13 +207,16 @@ public class PostRepositorySupport {
   }
 
   /**
-   * 현재 사용자가 게시글 작성자를 팔로우하는지 확인하는 EXISTS 표현식을 생성한다.
+   * 현재 사용자가 게시글 작성자를 팔로우하는지 확인하는 표현식을 생성한다.
    *
    * @param author 게시글 작성자 경로
-   * @param client 현재 사용자
-   * @return 현재 사용자가 게시글 작성자를 팔로우하면 true인 표현식
+   * @param client 조회 기준 사용자 (null 허용)
+   * @return 조회 기준 사용자가 null이면 false, 아니면 작성자 팔로우 관계의 존재 여부
    */
   public BooleanExpression isFollowing(QUser author, User client) {
+    if (client == null) {
+      return Expressions.FALSE;
+    }
     QFollow follow = QFollow.follow;
     return JPAExpressions
         .selectOne()

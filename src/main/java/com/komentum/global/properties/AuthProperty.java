@@ -1,10 +1,13 @@
 package com.komentum.global.properties;
 
+import jakarta.validation.constraints.AssertTrue;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 @Getter
+@Validated
 @RequiredArgsConstructor
 @ConfigurationProperties(prefix = "auth")
 public class AuthProperty {
@@ -19,4 +22,14 @@ public class AuthProperty {
   private final Long refreshTokenExpiresIn;
   private final String oauth2RedirectUrl;
   private final Boolean withHttps;
+  private final String sameSite;
+
+  /**
+   * SameSite가 None이라면 withHttps는 반드시 true이어야 한다
+   * SameSite가 None이 아니라면 withHttps의 값은 상관 없다.
+   * */
+  @AssertTrue(message = "SameSite=None must be used with secure=true")
+  public boolean isSameSiteNoneWithSecure() {
+    return !"None".equalsIgnoreCase(sameSite) || withHttps;
+  }
 }

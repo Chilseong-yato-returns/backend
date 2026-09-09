@@ -114,8 +114,8 @@ public class SecurityConfig {
     devCorsConfiguration.setAllowCredentials(true);
     // apply CORS configuration
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", configuration);
     source.registerCorsConfiguration("/dev/users/auth", devCorsConfiguration);
+    source.registerCorsConfiguration("/**", configuration);
     return source;
   }
 

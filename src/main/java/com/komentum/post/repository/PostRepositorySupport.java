@@ -11,6 +11,7 @@ import com.komentum.post.dto.PostSummary;
 import com.komentum.post.dto.query.PostQuery;
 import com.komentum.post.service.enums.CategoryType;
 import com.komentum.global.exception.ResourceNotFoundException;
+import com.komentum.user.domain.QFollow;
 import com.komentum.user.domain.QUser;
 import com.komentum.user.domain.User;
 import com.querydsl.core.types.ConstructorExpression;
@@ -179,7 +180,17 @@ public class PostRepositorySupport {
     return postType == null ? null : post.postType.eq(postType);
   }
 
+  /**
+   * 조회 기준 사용자의 게시글 좋아요 여부를 확인하는 표현식을 생성한다.
+   *
+   * @param post 게시글 경로
+   * @param user 조회 기준 사용자 (null 허용)
+   * @return 조회 기준 사용자가 null이면 false, 아니면 좋아요 관계의 존재 여부
+   */
   public BooleanExpression isPreferred(QPost post, User user) {
+    if (user == null) {
+      return Expressions.FALSE;
+    }
     QPrefer prefer = QPrefer.prefer;
     return JPAExpressions
         .selectOne()
@@ -191,7 +202,17 @@ public class PostRepositorySupport {
         .exists();
   }
 
+  /**
+   * 조회 기준 사용자의 게시글 북마크 여부를 확인하는 표현식을 생성한다.
+   *
+   * @param post 게시글 경로
+   * @param user 조회 기준 사용자 (null 허용)
+   * @return 조회 기준 사용자가 null이면 false, 아니면 북마크 관계의 존재 여부
+   */
   public BooleanExpression isBookmarked(QPost post, User user) {
+    if (user == null) {
+      return Expressions.FALSE;
+    }
     QCategoryPost categoryPost = QCategoryPost.categoryPost;
 
     return JPAExpressions
@@ -201,6 +222,28 @@ public class PostRepositorySupport {
             categoryPost.post.eq(post),
             categoryPost.category.owner.eq(user),
             categoryPost.category.categoryType.eq(CategoryType.BOOKMARK)
+        )
+        .exists();
+  }
+
+  /**
+   * 현재 사용자가 게시글 작성자를 팔로우하는지 확인하는 표현식을 생성한다.
+   *
+   * @param author 게시글 작성자 경로
+   * @param client 조회 기준 사용자 (null 허용)
+   * @return 조회 기준 사용자가 null이면 false, 아니면 작성자 팔로우 관계의 존재 여부
+   */
+  public BooleanExpression isFollowing(QUser author, User client) {
+    if (client == null) {
+      return Expressions.FALSE;
+    }
+    QFollow follow = QFollow.follow;
+    return JPAExpressions
+        .selectOne()
+        .from(follow)
+        .where(
+            follow.follower.eq(client),
+            follow.followee.eq(author)
         )
         .exists();
   }

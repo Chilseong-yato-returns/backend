@@ -59,6 +59,7 @@ public class ThemeBoardMapperSupport {
         .tags(tags.stream().map(TagResponse::from).toList())
         .liked(detail.isLiked())
         .bookmarked(detail.isBookmarked())
+        .following(detail.isFollowing())
         .profileImage(detail.getProfileImage())
         .themeDesignAssetDtoList(themeDesignAssetDtoList)
         .build();

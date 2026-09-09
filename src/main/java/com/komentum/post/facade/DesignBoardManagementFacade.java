@@ -63,6 +63,7 @@ public class DesignBoardManagementFacade {
   /**
    * 게시글 ID 기반으로 디자인 에셋 게시글 상세 조회
    * @param postId 게시글 ID
+   * @param userIdentifier 사용자 식별자 (비인증 요청은 null)
    * @return 특정 post id를 갖는 디자인 에셋 게시글 상세 정보
    * */
   @Transactional(readOnly = true)
@@ -108,13 +109,13 @@ public class DesignBoardManagementFacade {
    * 디자인 에셋 게시글 상세 조회 시 연관 디자인 에셋 게시글을 함께 제공한다
    * @param pageable 페이징 정보
    * @param pinnedPostId page=0일 때, 위에 고정할 게시글 정보
-   * @param userIdentifier 사용자 식별자
+   * @param userIdentifier 사용자 식별자 (비인증 요청은 null)
    * @return 디자인 에셋 상세 정보 목록
    * */
   @Transactional(readOnly = true)
   public List<DesignBoardDetailDto> findBoardDetails(Pageable pageable, Long pinnedPostId,
       String userIdentifier) {
-    User client = userEntityFinder.findUserEntity(userIdentifier);
+    User client = userIdentifier == null ? null : userEntityFinder.findUserEntity(userIdentifier);
     Post pinnedPost = pinnedPostId == null ?
         null :
         postService.findByPostIdAndPostType(pinnedPostId, PostType.DESIGN_BOARD);

@@ -3,6 +3,9 @@ package com.komentum.post.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.komentum.designcomponent.domain.ComponentType;
@@ -37,7 +40,9 @@ import com.komentum.test.dto.MockMvcMultipartRequestDto;
 import com.komentum.test.dto.MockMvcRequestDto;
 import com.komentum.test.dto.TestClientDto;
 import com.komentum.test.dto.TestParams;
+import com.komentum.user.domain.Follow;
 import com.komentum.user.domain.User;
+import com.komentum.user.repository.FollowRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -59,6 +64,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.util.MultiValueMap;
 
 @SpringBootTest
@@ -104,6 +110,9 @@ public class DesignBoardControllerTest {
 
   @Autowired
   private TestDataRemover testDataRemover;
+
+  @Autowired
+  private FollowRepository followRepository;
 
   UserScenarioSupport.UserScenarioResult userResult;
   DesignComponentScenarioSupport.DesignComponentScenarioResult designComponentResult;
@@ -308,6 +317,63 @@ public class DesignBoardControllerTest {
     assertDesignBoard(response);
   }
 
+  /**
+   * 비인증 요청에서도 디자인 게시글 단건 상세 정보와 false인 사용자별 상태값을 반환하는지 검증한다.
+   */
+  @Test
+  @DisplayName("비인증 사용자가 디자인 게시글 단건 상세를 조회하면 상세 정보와 false인 사용자별 상태값을 반환한다")
+  void findDesignBoardByPostId_withoutAuthentication_returnsDetail() throws Exception {
+    // given
+    Post targetPost = postResult.designBoards().get(0).getPost();
+    // when
+    ResultActions result = mockMvc.perform(get("/api/design-boards/{postId}", targetPost.getPostId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.liked").exists())
+        .andExpect(jsonPath("$.liked").value(false))
+        .andExpect(jsonPath("$.bookmarked").exists())
+        .andExpect(jsonPath("$.bookmarked").value(false))
+        .andExpect(jsonPath("$.following").exists())
+        .andExpect(jsonPath("$.following").value(false));
+    DesignBoardDetailDto response = mockMvcUtils.parseResponse(result, new TypeReference<>() {
+    });
+    // then
+    assertThat(response.getPostId()).isEqualTo(targetPost.getPostId());
+    assertThat(response.getTitle()).isEqualTo(targetPost.getTitle());
+    assertThat(response.getContent()).isEqualTo(targetPost.getContent());
+    assertDesignBoard(response);
+  }
+
+  @Test
+  @DisplayName("디자인 게시글 단건 상세 조회 시 현재 사용자의 작성자 팔로우 여부를 반환한다")
+  void findDesignBoardByPostId_returnsFollowingStatus() throws Exception {
+    // given
+    DesignBoard targetDesignBoard = postResult.designBoards().get(0);
+    User author = targetDesignBoard.getPost().getUser();
+    User followingClient = userResult.users().stream()
+        .filter(user -> !user.getUserId().equals(author.getUserId()))
+        .findFirst()
+        .orElseThrow();
+    User nonFollowingClient = userResult.users().stream()
+        .filter(user -> !user.getUserId().equals(author.getUserId()))
+        .filter(user -> !user.getUserId().equals(followingClient.getUserId()))
+        .findFirst()
+        .orElseThrow();
+    followRepository.saveAndFlush(new Follow(followingClient, author));
+    // when & then
+    mockMvc.perform(mockMvcUtils.addAuthentication(
+            get("/api/design-boards/{postId}", targetDesignBoard.getPost().getPostId()),
+            TestClientDto.fromEntity(followingClient)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.following").exists())
+        .andExpect(jsonPath("$.following").value(true));
+    mockMvc.perform(mockMvcUtils.addAuthentication(
+            get("/api/design-boards/{postId}", targetDesignBoard.getPost().getPostId()),
+            TestClientDto.fromEntity(nonFollowingClient)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.following").exists())
+        .andExpect(jsonPath("$.following").value(false));
+  }
+
   @Test
   @DisplayName("If a pinned post ID is provided, place that post at the top of the first page and return only design boards written by the same author.")
   void findDesignBoardDetails_ifPinnedPostIdExists() throws Exception {
@@ -335,6 +401,72 @@ public class DesignBoardControllerTest {
     for (DesignBoardDetailDto dto : response) {
       assertDesignBoard(dto);
     }
+  }
+
+  /**
+   * 비인증 요청에서도 디자인 게시글 상세 목록의 모든 항목과 false인 사용자별 상태값을 반환하는지 검증한다.
+   */
+  @Test
+  @DisplayName("비인증 사용자가 디자인 게시글 상세 목록을 조회하면 각 상세 정보와 false인 사용자별 상태값을 반환한다")
+  void findDesignBoardDetails_withoutAuthentication_returnsDetails() throws Exception {
+    // given
+    List<Long> expectedPostIds = postResult.designBoards().stream()
+        .map(designBoard -> designBoard.getPost().getPostId())
+        .distinct()
+        .toList();
+    MultiValueMap<String, String> params = TestParams.withPaging(0, expectedPostIds.size());
+    // when
+    ResultActions result = mockMvc.perform(get("/api/design-boards/details").params(params))
+        .andExpect(status().isOk());
+    List<DesignBoardDetailDto> response = mockMvcUtils.parseResponse(result, new TypeReference<>() {
+    });
+    // then
+    assertThat(response).isNotEmpty().hasSize(expectedPostIds.size());
+    assertThat(response).extracting(DesignBoardDetailDto::getPostId)
+        .containsExactlyInAnyOrderElementsOf(expectedPostIds);
+    for (int i = 0; i < response.size(); i++) {
+      assertDesignBoard(response.get(i));
+      result.andExpect(jsonPath("$[" + i + "].liked").exists())
+          .andExpect(jsonPath("$[" + i + "].liked").value(false))
+          .andExpect(jsonPath("$[" + i + "].bookmarked").exists())
+          .andExpect(jsonPath("$[" + i + "].bookmarked").value(false))
+          .andExpect(jsonPath("$[" + i + "].following").exists())
+          .andExpect(jsonPath("$[" + i + "].following").value(false));
+    }
+  }
+
+  @Test
+  @DisplayName("디자인 게시글 상세 목록 조회 시 현재 사용자의 작성자 팔로우 여부를 반환한다")
+  void findDesignBoardDetails_returnsFollowingStatus() throws Exception {
+    // given
+    DesignBoard targetDesignBoard = postResult.designBoards().get(0);
+    Post targetPost = targetDesignBoard.getPost();
+    User author = targetPost.getUser();
+    User followingClient = userResult.users().stream()
+        .filter(user -> !user.getUserId().equals(author.getUserId()))
+        .findFirst()
+        .orElseThrow();
+    User nonFollowingClient = userResult.users().stream()
+        .filter(user -> !user.getUserId().equals(author.getUserId()))
+        .filter(user -> !user.getUserId().equals(followingClient.getUserId()))
+        .findFirst()
+        .orElseThrow();
+    followRepository.saveAndFlush(new Follow(followingClient, author));
+    MultiValueMap<String, String> params = TestParams.withPaging(0, 1);
+    params.add("pinnedPostId", targetPost.getPostId().toString());
+    // when & then
+    mockMvc.perform(mockMvcUtils.addAuthentication(
+            get("/api/design-boards/details").params(params),
+            TestClientDto.fromEntity(followingClient)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].following").exists())
+        .andExpect(jsonPath("$[0].following").value(true));
+    mockMvc.perform(mockMvcUtils.addAuthentication(
+            get("/api/design-boards/details").params(params),
+            TestClientDto.fromEntity(nonFollowingClient)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].following").exists())
+        .andExpect(jsonPath("$[0].following").value(false));
   }
 
   @Test
@@ -448,9 +580,11 @@ public class DesignBoardControllerTest {
         .toList();
     List<Integer> designComponentIds = targetDesignComponents.stream()
         .map(DesignComponent::getDesignComponentId).toList();
+    String expectedTitle = "t".repeat(100);
+    String expectedContent = "c".repeat(2000);
     DesignBoardCreateDto createDto = DesignBoardCreateDto.builder()
-        .title("test title")
-        .content("test content")
+        .title(expectedTitle)
+        .content(expectedContent)
         .designComponentIds(designComponentIds)
         .publicFlag(true)
         .postTags(tagCreateDtoList)
@@ -477,7 +611,50 @@ public class DesignBoardControllerTest {
         .containsExactlyInAnyOrderElementsOf(tagNames);
     assertThat(response.getPreviewImageUrl()).hasSize(
         targetDesignComponents.size() + 1);//대표 이미지 1개 + design component url 목록
+    assertThat(response.getTitle()).isEqualTo(expectedTitle);
+    assertThat(response.getContent()).isEqualTo(expectedContent);
+    Post savedPost = postRepository.findById(response.getPostId()).orElseThrow();
+    assertThat(savedPost.getTitle()).isEqualTo(expectedTitle);
+    assertThat(savedPost.getContent()).isEqualTo(expectedContent);
     assertDesignBoard(response);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"title", "content"})
+  @DisplayName("디자인 게시글 생성 시 제목 또는 본문이 최대 길이를 초과하면 400을 반환한다")
+  void createDesignBoard_exceedingTextLimit_returnsBadRequest(String invalidField)
+      throws Exception {
+    // given
+    User author = userResult.getFirstUser();
+    DesignComponent targetDesignComponent = designComponentScenarioSupport
+        .builder(List.of(author))
+        .withCountPerUser(1)
+        .build()
+        .designComponents()
+        .get(0);
+    DesignBoardCreateDto createDto = DesignBoardCreateDto.builder()
+        .title("title".equals(invalidField) ? "t".repeat(101) : "t".repeat(100))
+        .content("content".equals(invalidField) ? "c".repeat(2001) : "c".repeat(2000))
+        .designComponentIds(List.of(targetDesignComponent.getDesignComponentId()))
+        .publicFlag(true)
+        .postTags(List.of())
+        .build();
+    MockMultipartFile boardInfo = MockMultipartFileUtils
+        .generateJsonFormData("boardInfo", createDto);
+    // when & then
+    Map<String, String> response = mockMvcUtils.doAuthMultipartRequest(
+        MockMvcMultipartRequestDto.<Map<String, String>>builder()
+            .mockMvc(mockMvc)
+            .path("/api/design-boards")
+            .httpMethod(HttpMethod.POST)
+            .formDataList(List.of(boardInfo))
+            .clientDto(TestClientDto.fromEntity(author))
+            .statusCode(400)
+            .responseType(new TypeReference<>() {
+            })
+            .build()
+    );
+    assertThat(response).containsKey(invalidField);
   }
 
   @Test
@@ -495,8 +672,8 @@ public class DesignBoardControllerTest {
     List<Integer> designComponentIds = designComponentResult.designComponents().stream()
         .filter(dc -> dc.getUser().getUserId().equals(author.getUserId()))
         .map(DesignComponent::getDesignComponentId).toList();
-    String expectedTitle = UUID.randomUUID().toString();
-    String expectedContent = UUID.randomUUID().toString();
+    String expectedTitle = "t".repeat(100);
+    String expectedContent = "c".repeat(2000);
     DesignBoardUpdateDto updateDto = DesignBoardUpdateDto.builder()
         .title(expectedTitle)
         .content(expectedContent)
@@ -525,7 +702,48 @@ public class DesignBoardControllerTest {
     assertThat(response.getTags().stream().map(TagResponse::getTagName))
         .containsExactlyInAnyOrderElementsOf(tagNames);
     assertThat(response.getPreviewImageUrl()).hasSize(3);
+    assertThat(response.getTitle()).isEqualTo(expectedTitle);
+    assertThat(response.getContent()).isEqualTo(expectedContent);
+    Post savedPost = postRepository.findById(response.getPostId()).orElseThrow();
+    assertThat(savedPost.getTitle()).isEqualTo(expectedTitle);
+    assertThat(savedPost.getContent()).isEqualTo(expectedContent);
     assertDesignBoard(response);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"title", "content"})
+  @DisplayName("디자인 게시글 수정 시 제목 또는 본문이 최대 길이를 초과하면 400을 반환한다")
+  void updateDesignBoard_exceedingTextLimit_returnsBadRequest(String invalidField)
+      throws Exception {
+    // given
+    DesignBoard targetDesignBoard = postResult.designBoards().get(0);
+    User author = targetDesignBoard.getPost().getUser();
+    List<Integer> designComponentIds = designComponentResult.designComponents().stream()
+        .filter(component -> component.getUser().getUserId().equals(author.getUserId()))
+        .map(DesignComponent::getDesignComponentId)
+        .toList();
+    DesignBoardUpdateDto updateDto = DesignBoardUpdateDto.builder()
+        .title("title".equals(invalidField) ? "t".repeat(101) : "t".repeat(100))
+        .content("content".equals(invalidField) ? "c".repeat(2001) : "c".repeat(2000))
+        .designComponentIds(designComponentIds)
+        .postTags(List.of())
+        .build();
+    MockMultipartFile boardInfo = MockMultipartFileUtils
+        .generateJsonFormData("boardInfo", updateDto);
+    // when & then
+    Map<String, String> response = mockMvcUtils.doAuthMultipartRequest(
+        MockMvcMultipartRequestDto.<Map<String, String>>builder()
+            .mockMvc(mockMvc)
+            .path(String.format("/api/design-boards/%d", targetDesignBoard.getPost().getPostId()))
+            .httpMethod(HttpMethod.PATCH)
+            .formDataList(List.of(boardInfo))
+            .clientDto(TestClientDto.fromEntity(author))
+            .statusCode(400)
+            .responseType(new TypeReference<>() {
+            })
+            .build()
+    );
+    assertThat(response).containsKey(invalidField);
   }
 
   @Test

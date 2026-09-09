@@ -44,7 +44,12 @@ public class ThemeBoardTransactionService {
   private final ThemeImageService themeImageService;
 
   /**
-   * 테마 게시글 상세 정보를 조회한다
+   * 테마 게시글 상세 정보를 조회한다.
+   *
+   * @param postId 게시글 ID
+   * @param userIdentifier 현재 사용자 식별자 (비인증 요청이면 null)
+   * @param withImages 테마 이미지 포함 여부
+   * @return 테마 게시글 상세 정보
    * */
   @Transactional(readOnly = true)
   public ThemeBoardDetailDto findThemeBoardDetail(Long postId, String userIdentifier,
@@ -52,8 +57,9 @@ public class ThemeBoardTransactionService {
     if (!themeBoardRepository.existsByPost_PostId(postId)) {
       throw new EntityNotFoundException("cannot find theme board with post id = " + postId);
     }
+    User client = userIdentifier == null ? null : userEntityFinder.findUserEntity(userIdentifier);
     ThemeBoardQuery.Detail detail = themeBoardRepositorySupport
-        .findThemeBoardQueryDetail(postId, userEntityFinder.findUserEntity(userIdentifier));
+        .findThemeBoardQueryDetail(postId, client);
     List<Tag> tags = tagService.findAllByPostId(postId);
     List<ThemeDesignAssetDto> themeDesignAssetDtoList = Boolean.TRUE.equals(withImages)
         ? themeImageService.findThemeDesignAssetMap(

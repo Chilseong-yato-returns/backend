@@ -126,6 +126,7 @@ public class ThemeBoardRepositorySupport {
             commentCount,
             postRepositorySupport.isPreferred(post, client),
             postRepositorySupport.isBookmarked(post, client),
+            postRepositorySupport.isFollowing(user, client),
             user.profileImgUrl
         ))
         .from(themeBoard)

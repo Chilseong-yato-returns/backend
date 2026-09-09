@@ -64,6 +64,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.util.MultiValueMap;
 
 @SpringBootTest
@@ -316,6 +317,32 @@ public class DesignBoardControllerTest {
     assertDesignBoard(response);
   }
 
+  /**
+   * 비인증 요청에서도 디자인 게시글 단건 상세 정보와 false인 사용자별 상태값을 반환하는지 검증한다.
+   */
+  @Test
+  @DisplayName("비인증 사용자가 디자인 게시글 단건 상세를 조회하면 상세 정보와 false인 사용자별 상태값을 반환한다")
+  void findDesignBoardByPostId_withoutAuthentication_returnsDetail() throws Exception {
+    // given
+    Post targetPost = postResult.designBoards().get(0).getPost();
+    // when
+    ResultActions result = mockMvc.perform(get("/api/design-boards/{postId}", targetPost.getPostId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.liked").exists())
+        .andExpect(jsonPath("$.liked").value(false))
+        .andExpect(jsonPath("$.bookmarked").exists())
+        .andExpect(jsonPath("$.bookmarked").value(false))
+        .andExpect(jsonPath("$.following").exists())
+        .andExpect(jsonPath("$.following").value(false));
+    DesignBoardDetailDto response = mockMvcUtils.parseResponse(result, new TypeReference<>() {
+    });
+    // then
+    assertThat(response.getPostId()).isEqualTo(targetPost.getPostId());
+    assertThat(response.getTitle()).isEqualTo(targetPost.getTitle());
+    assertThat(response.getContent()).isEqualTo(targetPost.getContent());
+    assertDesignBoard(response);
+  }
+
   @Test
   @DisplayName("디자인 게시글 단건 상세 조회 시 현재 사용자의 작성자 팔로우 여부를 반환한다")
   void findDesignBoardByPostId_returnsFollowingStatus() throws Exception {
@@ -373,6 +400,37 @@ public class DesignBoardControllerTest {
     assertThat(response.get(0).getPostId()).isEqualTo(pinnedPost.getPostId());
     for (DesignBoardDetailDto dto : response) {
       assertDesignBoard(dto);
+    }
+  }
+
+  /**
+   * 비인증 요청에서도 디자인 게시글 상세 목록의 모든 항목과 false인 사용자별 상태값을 반환하는지 검증한다.
+   */
+  @Test
+  @DisplayName("비인증 사용자가 디자인 게시글 상세 목록을 조회하면 각 상세 정보와 false인 사용자별 상태값을 반환한다")
+  void findDesignBoardDetails_withoutAuthentication_returnsDetails() throws Exception {
+    // given
+    List<Long> expectedPostIds = postResult.designBoards().stream()
+        .map(designBoard -> designBoard.getPost().getPostId())
+        .toList();
+    MultiValueMap<String, String> params = TestParams.withPaging(0, expectedPostIds.size());
+    // when
+    ResultActions result = mockMvc.perform(get("/api/design-boards/details").params(params))
+        .andExpect(status().isOk());
+    List<DesignBoardDetailDto> response = mockMvcUtils.parseResponse(result, new TypeReference<>() {
+    });
+    // then
+    assertThat(response).isNotEmpty().hasSize(expectedPostIds.size());
+    assertThat(response).extracting(DesignBoardDetailDto::getPostId)
+        .containsExactlyInAnyOrderElementsOf(expectedPostIds);
+    for (int i = 0; i < response.size(); i++) {
+      assertDesignBoard(response.get(i));
+      result.andExpect(jsonPath("$[" + i + "].liked").exists())
+          .andExpect(jsonPath("$[" + i + "].liked").value(false))
+          .andExpect(jsonPath("$[" + i + "].bookmarked").exists())
+          .andExpect(jsonPath("$[" + i + "].bookmarked").value(false))
+          .andExpect(jsonPath("$[" + i + "].following").exists())
+          .andExpect(jsonPath("$[" + i + "].following").value(false));
     }
   }
 
